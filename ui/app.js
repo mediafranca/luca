@@ -203,6 +203,37 @@ if (TAURI) {
   TAURI.event.listen("open-file", (e) => openPath(e.payload)); // apertura en caliente: añade pestaña
 }
 
+// ---------- Modos de vista (source · split · rendered) y zen ----------
+function applyMode(m) {
+  document.body.dataset.mode = m;
+  for (const b of document.querySelectorAll("#modebar button[data-mode]"))
+    b.classList.toggle("active", b.dataset.mode === m);
+  try { localStorage.setItem("luca.mode", m); } catch {}
+}
+function toggleZen(force) {
+  const on = force ?? document.body.dataset.zen !== "on";
+  document.body.dataset.zen = on ? "on" : "off";
+  try { localStorage.setItem("luca.zen", on ? "on" : "off"); } catch {}
+}
+for (const b of document.querySelectorAll("#modebar button[data-mode]"))
+  b.addEventListener("click", () => applyMode(b.dataset.mode));
+document.getElementById("zen").addEventListener("click", () => toggleZen());
+
+addEventListener("keydown", (e) => {
+  const cmd = e.metaKey || e.ctrlKey;
+  if (cmd && e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); toggleZen(); }
+  else if (cmd && e.key === "1") { e.preventDefault(); applyMode("source"); }
+  else if (cmd && e.key === "2") { e.preventDefault(); applyMode("split"); }
+  else if (cmd && e.key === "3") { e.preventDefault(); applyMode("rendered"); }
+  else if (e.key === "Escape" && document.body.dataset.zen === "on") { toggleZen(false); }
+});
+
+// Estado inicial, recordado por visor (localStorage es una comodidad local).
+let mode0 = "split", zen0 = "off";
+try { mode0 = localStorage.getItem("luca.mode") || "split"; zen0 = localStorage.getItem("luca.zen") || "off"; } catch {}
+applyMode(mode0);
+document.body.dataset.zen = zen0;
+
 const SAMPLE = `# luca
 
 Editor Markdown mínimo y rápido, con **Mermaid offline** (mermaid 12 + ELK, tidy-tree y ZenUML).

@@ -8,7 +8,7 @@
   :root { color-scheme: light dark; --rule: rgba(127,127,127,.25); }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { display: grid; grid-template-rows: auto 1fr; height: 100vh;
+  body { display: grid; grid-template-rows: auto auto 1fr; height: 100vh;
          font: 15px/1.6 -apple-system, system-ui, sans-serif; background: Canvas; }
 
   /* Barra de pestañas */
@@ -23,9 +23,22 @@
                 font-size: 15px; line-height: 1; padding: 0 2px; opacity: .5; }
   .tab .close:hover { opacity: 1; }
 
+  /* Barra de modos */
+  #modebar { display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+             border-bottom: 1px solid var(--rule); font-size: 12px; }
+  #modebar button { border: 1px solid var(--rule); background: Canvas; color: inherit;
+                    padding: 3px 11px; border-radius: 6px; cursor: pointer; opacity: .55; }
+  #modebar button.active { opacity: 1; font-weight: 600; }
+  #modebar .spacer { flex: 1; }
+
   /* Área de trabajo: editor | preview */
   #workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
                background: var(--rule); min-height: 0; }
+  body[data-mode="source"]   #previews { display: none; }
+  body[data-mode="source"]   #workspace { grid-template-columns: 1fr; }
+  body[data-mode="rendered"] #editors  { display: none; }
+  body[data-mode="rendered"] #workspace { grid-template-columns: 1fr; }
+  body[data-zen="on"] #tabs, body[data-zen="on"] #modebar { display: none; }
   #editors, #previews { position: relative; min-height: 0; background: Canvas; overflow: hidden; }
   .doc-editor { height: 100%; }
   .doc-editor[hidden], .doc-preview[hidden] { display: none; }
@@ -47,6 +60,13 @@
 </head>
 <body>
   <div id="tabs"></div>
+  <div id="modebar">
+    <button data-mode="source">source</button>
+    <button data-mode="split">split</button>
+    <button data-mode="rendered">rendered</button>
+    <span class="spacer"></span>
+    <button id="zen" title="Modo zen (oculta las barras) · ⌘⇧Z">zen</button>
+  </div>
   <div id="workspace">
     <div id="editors"></div>
     <div id="previews"></div>
