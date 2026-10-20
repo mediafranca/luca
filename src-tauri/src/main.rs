@@ -56,8 +56,12 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         b.build(app)
     };
 
+    let prefs_mermaid = item("prefs_mermaid", "Configuración de diseño…", Some("CmdOrCtrl+,"))?;
+
     let app_menu = SubmenuBuilder::new(app, "Luca")
         .about(None)
+        .separator()
+        .item(&prefs_mermaid)
         .separator()
         .services()
         .separator()
@@ -68,8 +72,6 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .quit()
         .build()?;
 
-    let prefs_mermaid = item("prefs_mermaid", "Tokens y tema de Mermaid…", None)?;
-    let preferencias = SubmenuBuilder::new(app, "Preferencias").item(&prefs_mermaid).build()?;
     let archivo = SubmenuBuilder::new(app, "Archivo")
         .item(&item("new", "Nuevo", Some("CmdOrCtrl+N"))?)
         .item(&item("open", "Abrir…", Some("CmdOrCtrl+O"))?)
@@ -79,7 +81,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .separator()
         .item(&item("export_pdf", "Exportar (PDF)…", Some("CmdOrCtrl+E"))?)
         .separator()
-        .item(&preferencias)
+        .item(&prefs_mermaid)
         .separator()
         .item(&item("close_tab", "Cerrar pestaña", Some("CmdOrCtrl+W"))?)
         .build()?;

@@ -7,8 +7,7 @@
 **El editor Markdown para [Vera](https://github.com/mediafranca)**
 </div>
 
-Luca es un editor Markdown sencillo y rápido para elaborar el texto de una página
-antes de publicarla en Vera, con vista previa en vivo y diagramas Mermaid.
+Luca es un editor Markdown sencillo y rápido con soporte para diagramas Mermaid.
 
 Luca toma su nombre de Luca Pacioli, fraile franciscano y matemático del
 Renacimiento italiano. En [*Divina proportione*](https://archive.org/download/divinaproportion00paci/divinaproportion00paci.pdf),
@@ -50,7 +49,7 @@ disponible para otras herramientas.
 
 ## Capturas
 
-_Próximamente._
+![Captura de pantalla de Luca](./assets/luca-screenshot.png)
 
 ## Correr
 

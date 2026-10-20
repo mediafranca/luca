@@ -8,7 +8,8 @@
   "repository": { "type": "git", "url": "https://github.com/mediafranca/luca" },
   "license": "EUPL-1.2",
   "scripts": {
-    "vendor": "node scripts/vendor.mjs"
+    "vendor": "node scripts/vendor.mjs",
+    "build:editor": "esbuild ui/editor.src.js --outfile=ui/vendor/codemirror/editor.js --bundle --format=esm --minify"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
