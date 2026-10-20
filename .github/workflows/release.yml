@@ -1,4 +1,4 @@
-# Compila Luca para macOS (Apple Silicon e Intel), Windows y Linux y publica los
+# Compila Luca para macOS (binario universal: Apple Silicon e Intel), Windows y Linux y publica los
 # instaladores en un release de GitHub. Se dispara al empujar una etiqueta v*
 # (p. ej. v0.3.0) o a mano desde la pestaña Actions; en ambos casos el release
 # toma su nombre de la versión de src-tauri/tauri.conf.json.
@@ -18,10 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Un solo .dmg universal: nadie tiene que saber qué chip tiene su Mac,
+          # y en Apple Silicon corre nativo (sin Rosetta, que Apple retira).
           - platform: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
+            args: --target universal-apple-darwin
           - platform: ubuntu-22.04
             args: ""
           - platform: windows-latest
@@ -61,8 +61,7 @@ jobs:
           releaseBody: |
             Instaladores de Luca v__VERSION__. Baja hasta **Assets** y elige el archivo de tu sistema:
 
-            - **macOS con chip Apple** (M1 en adelante): `Luca_…_aarch64.dmg`
-            - **macOS con chip Intel**: `Luca_…_x64.dmg`
+            - **macOS** (Apple Silicon e Intel, el mismo archivo): `Luca_…_universal.dmg`
             - **Windows**: `Luca_…_x64-setup.exe`
             - **Linux**: `.AppImage` (cualquier distribución), `.deb` o `.rpm`
 

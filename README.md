@@ -23,8 +23,7 @@ En esa página, baja hasta **Assets** y elige el archivo de tu sistema:
 
 | Sistema | Archivo | Después de descargar |
 | --- | --- | --- |
-| macOS con chip Apple (M1, M2, M3, M4…) | `Luca_x.y.z_aarch64.dmg` | Abre el `.dmg` y arrastra Luca a Aplicaciones. |
-| macOS con chip Intel | `Luca_x.y.z_x64.dmg` | Igual que arriba. |
+| macOS (Apple Silicon e Intel, el mismo archivo) | `Luca_x.y.z_universal.dmg` | Abre el `.dmg` y arrastra Luca a Aplicaciones. |
 | Windows | `Luca_x.y.z_x64-setup.exe` (o el `.msi`) | Ejecuta el instalador. |
 | Linux | `.AppImage` (cualquier distribución), `.deb` (Debian, Ubuntu) o `.rpm` (Fedora) | Dale permiso de ejecución al AppImage o instala el paquete. |
 
@@ -90,6 +89,7 @@ cargo tauri build
 
 Los instaladores de la página de versiones los compila GitHub Actions
 (`.github/workflows/release.yml`) cada vez que se publica una etiqueta `vX.Y.Z`.
+El de macOS es un binario universal: corre nativo en Apple Silicon y en Intel.
 
 ## Estructura
 

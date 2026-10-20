@@ -1,6 +1,6 @@
 {
   "name": "luca",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Editor Markdown mínimo y rápido, con Mermaid offline.",
   "private": true,
   "type": "module",
