@@ -53,9 +53,17 @@ Tauri 2— móvil. El editor es un `<textarea>` con preview en vivo.
 - `src-tauri/` — cáscara nativa (Rust + Tauri).
 - `icon.svg` — fuente del icono; regenerar el set con `cargo tauri icon icon.png`.
 
+## Integración con Vera
+
+Luca es un editor de texto honesto y sin estado de Vera. El Markdown se guarda
+tal cual se escribe —sin IDs ni normalización—; Vera lleva las identidades en su
+manifiesto lateral. Luca se declara editor de `.md` / `text/markdown`
+(`bundle.fileAssociations`), así que Vera lo descubre por "Abrir con…" sin rutas
+escritas a mano. Un protocolo mayor (CLI / deep-link) se añadirá solo cuando haya
+una necesidad concreta.
+
 ## Próximos pasos
 
-1. Abrir/guardar archivos (diálogos nativos de Tauri).
-2. Editor real con CodeMirror (resaltado de sintaxis).
-3. Vendorizar marked + mermaid (offline, carga instantánea).
-4. Exportar a Vera / publicación.
+1. Editor real con CodeMirror (resaltado de sintaxis, también para Mermaid).
+2. Packs de iconos de Mermaid (iconify-json: logos, fa, material-icon-theme).
+3. Protocolo de vinculación con Vera cuando se defina (single-instance / deep-link).
