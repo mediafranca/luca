@@ -1,0 +1,72 @@
+# Compila Luca para macOS (Apple Silicon e Intel), Windows y Linux y publica los
+# instaladores en un release de GitHub. Se dispara al empujar una etiqueta v*
+# (p. ej. v0.3.0) o a mano desde la pestaña Actions; en ambos casos el release
+# toma su nombre de la versión de src-tauri/tauri.conf.json.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Dependencias de Linux (webkit2gtk)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # package-lock.json no se versiona: install, no ci. El hook beforeBuildCommand
+      # de Tauri ejecuta `npm run vendor` (empaqueta CodeMirror y copia mermaid/marked).
+      - run: npm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "Luca v__VERSION__"
+          releaseBody: |
+            Instaladores de Luca v__VERSION__. Baja hasta **Assets** y elige el archivo de tu sistema:
+
+            - **macOS con chip Apple** (M1 en adelante): `Luca_…_aarch64.dmg`
+            - **macOS con chip Intel**: `Luca_…_x64.dmg`
+            - **Windows**: `Luca_…_x64-setup.exe`
+            - **Linux**: `.AppImage` (cualquier distribución), `.deb` o `.rpm`
+
+            Si macOS dice que Luca «está dañada», no lo está: la app aún no lleva firma de Apple. Prueba clic derecho → Abrir. Si el aviso sigue, abre Terminal, pega `xattr -cr /Applications/Luca.app` y pulsa Intro. Más detalles en el README.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

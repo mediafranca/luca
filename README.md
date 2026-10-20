@@ -4,107 +4,124 @@
 
 # Luca
 
-**El editor Markdown para [Vera](https://github.com/mediafranca)**
+**Un editor Markdown completo, rápido y soberano**
 </div>
 
-Luca es un editor Markdown sencillo y rápido con soporte para diagramas Mermaid.
+Luca es un editor de texto Markdown para el escritorio. Escribes en texto
+plano, ves el resultado al instante y el archivo es tuyo: un `.md` corriente
+que puedes abrir con cualquier otra herramienta, hoy o dentro de veinte años.
+No hay cuenta, no hay nube, no hay formato propietario.
 
-Luca toma su nombre de Luca Pacioli, fraile franciscano y matemático del
-Renacimiento italiano. En [*Divina proportione*](https://archive.org/download/divinaproportion00paci/divinaproportion00paci.pdf),
-publicado en 1509, Pacioli incluyó un estudio sobre la construcción geométrica
-de las letras capitales: una manera de entender la escritura desde su forma, sus
-proporciones y el cuidado de sus trazos.
+## Descargar
 
-El nombre recoge esa atención a la forma escrita y la lleva a una herramienta
-cotidiana. Luca nace como un editor Markdown sencillo y rápido, pensado para que
-escribir, revisar y organizar un texto requiera el mínimo de intermediaciones.
-La referencia a Pacioli expresa una intención de diseño: ofrecer un entorno
-claro y proporcionado, cuya forma acompañe el trabajo de quien escribe.
+Luca funciona en macOS, Windows y Linux. Los instaladores están en la página de
+versiones de GitHub:
 
-Dentro del ecosistema MediaFranca, Luca se concibe como un lugar de elaboración
-del texto, pensado para facilitar su posterior publicación en Vera. Markdown
-ofrece una base legible y portable para ese recorrido, manteniendo el texto
-disponible para otras herramientas.
+**[Descargar la última versión →](https://github.com/mediafranca/luca/releases/latest)**
 
-> *Divina proportione* (Pacioli, 1509):
-> [facsímil original](https://archive.org/download/divinaproportion00paci/divinaproportion00paci.pdf) ·
-> [edición en español](https://matematicasiesoja.wordpress.com/wp-content/uploads/2020/04/la-divina-proporcic3b3n.-pdfdrive.com-.pdf)
+En esa página, baja hasta **Assets** y elige el archivo de tu sistema:
 
-## Funcionalidades actuales
+| Sistema | Archivo | Después de descargar |
+| --- | --- | --- |
+| macOS con chip Apple (M1, M2, M3, M4…) | `Luca_x.y.z_aarch64.dmg` | Abre el `.dmg` y arrastra Luca a Aplicaciones. |
+| macOS con chip Intel | `Luca_x.y.z_x64.dmg` | Igual que arriba. |
+| Windows | `Luca_x.y.z_x64-setup.exe` (o el `.msi`) | Ejecuta el instalador. |
+| Linux | `.AppImage` (cualquier distribución), `.deb` (Debian, Ubuntu) o `.rpm` (Fedora) | Dale permiso de ejecución al AppImage o instala el paquete. |
 
-- Editor **CodeMirror 6** con resaltado de sintaxis Markdown.
-- **Multidocumento** por pestañas: abrir un archivo no cierra los demás, y
-  reabrir uno ya abierto reutiliza su pestaña.
-- Modos de vista **source · split · rendered** y **modo zen** que oculta las
-  barras (atajos `⌘1`/`⌘2`/`⌘3`, `⌘⇧Z`, y `Esc` para salir del zen).
-- Vista previa en vivo: `marked` + **Mermaid 12 offline** con los motores
-  ELK, tidy-tree y ZenUML (CDN sólo de respaldo).
-- Abrir/guardar `.md` nativo, **guardado atómico** y aviso ante cambios
-  externos (no pisa en silencio lo que tocó otra app).
-- Asociación de tipo `.md` / `text/markdown`: el sistema (y Vera) abren Luca
-  por "Abrir con…".
-- Tipografía y tokens de color de **Vera** (IBM Plex), con claro/oscuro.
-- **Multiplataforma** sobre [Tauri 2](https://tauri.app): macOS, Windows,
-  Linux y —vía Tauri 2— móvil, desde una sola base de código.
+**Si macOS dice que Luca «está dañada» o «no se puede abrir».** Luca todavía
+no está firmada con un certificado de Apple, y macOS desconfía de las apps
+descargadas sin firma. No está dañada. Prueba primero con clic derecho sobre
+Luca en Aplicaciones y **Abrir**. Si el aviso sigue, abre la app Terminal, pega
+esta línea y pulsa Intro:
 
-## Capturas
+```bash
+xattr -cr /Applications/Luca.app
+```
+
+A partir de ahí Luca abre con normalidad. Windows puede mostrar un aviso
+parecido de SmartScreen: pulsa «Más información» y luego «Ejecutar de todas formas».
+
+## Qué hace
+
+- **Tres vistas**: código Markdown, vista dividida y texto renderizado
+  (`⌘1`, `⌘2`, `⌘3`). En la vista dividida puedes arrastrar el divisor y la
+  vista previa sigue al cursor.
+- **Edición sobre el texto renderizado**: en la vista renderizada pulsas un
+  párrafo, un título, una tabla o un diagrama y lo editas ahí mismo, con la
+  misma tipografía. El archivo sigue siendo Markdown puro.
+- **Modo zen** a pantalla completa, sin barras (`⌘⇧Z`, `Esc` para salir).
+- **Barra de herramientas**: encabezados, negrita, cursiva, listas, citas,
+  enlaces, bloques de código y un editor visual de tablas que acepta pegar
+  desde una hoja de cálculo.
+- **Diagramas Mermaid** renderizados sin conexión (flujos, secuencias, ELK,
+  ZenUML). El diagrama se guarda como texto, nunca como imagen.
+- **Varios documentos en pestañas**, guardado seguro (nunca pisa a medias un
+  archivo) y aviso si otro programa cambió el archivo mientras lo editabas.
+- **Exportar a PDF** desde el menú Archivo.
+- **Tipografía y colores configurables** (`⌘,`), con modo claro y oscuro.
+- Se registra como editor de archivos `.md`, así que «Abrir con…» lo encuentra.
 
 ![Captura de pantalla de Luca](./assets/luca-screenshot.png)
 
-## Correr
+## El nombre
+
+Luca toma su nombre de Luca Pacioli, fraile franciscano y matemático del
+Renacimiento. En [*Divina proportione*](https://archive.org/download/divinaproportion00paci/divinaproportion00paci.pdf)
+(1509) incluyó un estudio sobre la construcción geométrica de las letras
+capitales: una manera de entender la escritura desde su forma, sus proporciones
+y el cuidado de sus trazos. El ícono de Luca es su «L». La intención de diseño
+es la misma: un entorno claro y proporcionado cuya forma acompañe el trabajo de
+quien escribe.
+
+## Correr desde el código
+
+Necesitas [Rust](https://rustup.rs) con la CLI de Tauri 2 y [Node.js](https://nodejs.org).
 
 ```bash
+npm install
 cargo tauri dev
 ```
 
-Para empaquetar la app nativa del sistema actual:
+Para empaquetar la app del sistema actual:
 
 ```bash
 cargo tauri build
 ```
 
+Los instaladores de la página de versiones los compila GitHub Actions
+(`.github/workflows/release.yml`) cada vez que se publica una etiqueta `vX.Y.Z`.
+
 ## Estructura
 
-- `ui/` — frontend (HTML/CSS/JS; CodeMirror empaquetado con esbuild).
-- `src-tauri/` — cáscara nativa (Rust + Tauri).
-- `specs/` — especificación [Allium](https://github.com/mediafranca) del
-  comportamiento (ver abajo).
-- `scripts/vendor.mjs` — vendoriza mermaid/marked y empaqueta CodeMirror a
-  `ui/vendor/` (`npm run vendor`, también en `beforeDevCommand`).
-- `icon.png` — fuente del icono (la «L» construida al modo de Pacioli);
-  regenerar el set con `cargo tauri icon icon.png`.
+- `ui/` — interfaz (HTML/CSS/JS; CodeMirror 6 empaquetado con esbuild).
+- `src-tauri/` — cáscara nativa (Rust + Tauri 2).
+- `specs/` — especificación [Allium](https://github.com/mediafranca) del comportamiento.
+- `scripts/vendor.mjs` — vendoriza mermaid/marked y empaqueta CodeMirror en `ui/vendor/`.
+- `icon.png` — fuente del ícono; regenerar el set con `cargo tauri icon icon.png`.
 
 ## Especificación (Allium)
 
-El comportamiento de Luca está descrito en `specs/*.allium`, por consistencia
-con los demás repos de MediaFranca:
+El comportamiento de Luca está descrito en `specs/*.allium`:
 
-- `luca.allium` — módulo raíz (vocabulario y configuración).
-- `documento.allium` — modelo de documento y ciclo de vida multidocumento.
-- `vista-previa.allium` — superficies de editor y vista previa.
-- `vera.allium` — contrato de lanzamiento e integración con Vera.
+- `luca.allium` — módulo raíz.
+- `documento.allium` — documentos, pestañas y ciclo de vida.
+- `vista-previa.allium` — editor y vista previa.
+- `edicion-renderizada.allium` — edición por bloques sobre el texto renderizado.
+- `vera.allium` — convivencia con Vera.
 
 Validar con `allium check specs/`.
-
-## Integración con Vera
-
-Luca es un editor de texto honesto y sin estado de Vera. El Markdown se guarda
-tal cual se escribe —sin IDs ni normalización—; Vera lleva las identidades en su
-manifiesto lateral. Luca se declara editor de `.md` / `text/markdown`
-(`bundle.fileAssociations`), así que Vera lo descubre por "Abrir con…" sin rutas
-escritas a mano. Un protocolo mayor (CLI / deep-link) se añadirá solo cuando haya
-una necesidad concreta.
-
-## Próximos pasos
-
-1. Editar en modo *rendered* (WYSIWYG) — lo realmente «zen» del editor.
-2. Resolver rutas relativas de assets en la vista previa.
-3. Resaltado de sintaxis de Mermaid dentro del fence (gramática Lezer).
-4. Packs de iconos de Mermaid (iconify-json).
 
 ## Contribuir
 
 Las contribuciones son bienvenidas: ver [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Luca y Vera
+
+Luca nace dentro de [MediaFranca](https://github.com/mediafranca) y es el editor
+externo predeterminado de [Vera](https://github.com/mediafranca/vera). Esa
+relación no cambia nada de lo anterior: Vera abre un `.md` en Luca por «Abrir
+con…», Luca lo guarda tal cual, sin inyectar metadatos ni normalizar nada, y
+nunca borra ni toca el grafo de Vera. Luca sirve igual sin Vera.
 
 <div align="center">
 <img src="assets/raised-fist.svg" width="70" alt="Puño alzado"><br>Aplicación soberana
@@ -115,6 +132,5 @@ Las contribuciones son bienvenidas: ver [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Autoría y licencia
 
-Luca es obra de [Herbert Spencer González](https://github.com/hspencer), dentro
-de MediaFranca. Publicado bajo la [Licencia Pública de la Unión Europea
-(EUPL 1.2)](LICENSE).
+Luca es obra de [Herbert Spencer González](https://github.com/hspencer).
+Publicado bajo la [Licencia Pública de la Unión Europea (EUPL 1.2)](LICENSE).
