@@ -9,8 +9,10 @@
     "beforeBuildCommand": "npm run vendor"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "luca",
         "width": 900,
         "height": 560,
@@ -30,6 +32,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown Document",
+        "description": "Documento Markdown",
+        "role": "Editor",
+        "mimeType": "text/markdown"
+      }
     ]
   }
 }

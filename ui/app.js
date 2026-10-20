@@ -70,13 +70,63 @@ async function render() {
   }
 }
 
+// ---- Archivos (solo dentro de Tauri; en navegador el editor es efímero) ----
+// El texto se guarda tal cual lo escribió el usuario: Vera lleva las identidades
+// en su manifiesto lateral, luca no inyecta nada en el Markdown.
+const TAURI = window.__TAURI__;
+let currentPath = null;
+let dirty = false;
+
+const baseName = (p) => (p ? p.split(/[\\/]/).pop() : "sin título");
+async function setTitle() {
+  try { await TAURI?.window.getCurrentWindow().setTitle(`${baseName(currentPath)}${dirty ? " •" : ""} — luca`); } catch {}
+}
+function markDirty() { if (!dirty) { dirty = true; setTitle(); } }
+
+async function loadPath(path) {
+  editor.value = await TAURI.core.invoke("read_file", { path });
+  currentPath = path; dirty = false;
+  render(); setTitle();
+}
+async function openFile() {
+  const path = await TAURI.dialog.open({ filters: [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }] });
+  if (typeof path === "string") await loadPath(path);
+}
+async function saveFile(forceDialog = false) {
+  let path = currentPath;
+  if (forceDialog || !path) {
+    path = await TAURI.dialog.save({
+      defaultPath: currentPath ?? "sin título.md",
+      filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+    });
+    if (!path) return;
+  }
+  await TAURI.core.invoke("write_file", { path, contents: editor.value });
+  currentPath = path; dirty = false; setTitle();
+}
+function newFile() {
+  if (dirty && !confirm("Hay cambios sin guardar. ¿Descartar?")) return;
+  editor.value = ""; currentPath = null; dirty = false; render(); setTitle();
+}
+
 // ponytail: 150ms debounce. Un render viejo que siga corriendo escribe sobre
 // bloques que el innerHTML nuevo ya reemplazó; es inocuo para este MVP.
 let t;
-editor.addEventListener("input", () => { clearTimeout(t); t = setTimeout(render, 150); });
+editor.addEventListener("input", () => { markDirty(); clearTimeout(t); t = setTimeout(render, 150); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { initMermaid(); render(); });
 
-editor.value = `# luca
+if (TAURI) {
+  addEventListener("keydown", (e) => {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === "o") { e.preventDefault(); openFile(); }
+    else if (k === "s") { e.preventDefault(); saveFile(e.shiftKey); }
+    else if (k === "n") { e.preventDefault(); newFile(); }
+  });
+  TAURI.event.listen("open-file", (e) => loadPath(e.payload)); // apertura en caliente
+}
+
+const SAMPLE = `# luca
 
 Editor Markdown mínimo y rápido, con **Mermaid offline** (mermaid 12 + ELK, tidy-tree y ZenUML).
 
@@ -84,11 +134,11 @@ Editor Markdown mínimo y rápido, con **Mermaid offline** (mermaid 12 + ELK, ti
 flowchart LR
   escribir --> ver --> pensar --> escribir
 \`\`\`
-
-\`\`\`mermaid
-sequenceDiagram
-  Luca->>Vera: publicar texto
-  Vera-->>Luca: ok
-\`\`\`
 `;
+
+// Apertura en frío: si Vera/Finder lanzaron luca con un archivo, cárgalo.
+const pending = TAURI ? await TAURI.core.invoke("take_opened_file") : null;
+editor.value = pending ? await TAURI.core.invoke("read_file", { path: pending }) : SAMPLE;
+if (pending) { currentPath = pending; }
 render();
+setTitle();
