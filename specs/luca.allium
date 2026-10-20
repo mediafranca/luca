@@ -1,0 +1,37 @@
+-- allium: 3
+-- luca.allium — módulo raíz
+--
+-- luca: el editor Markdown de Vera, parte del ecosistema Media Franca. Un
+-- editor sencillo y rápido para elaborar el texto de una página antes de
+-- publicarla en Vera, con vista previa en vivo y diagramas Mermaid.
+--
+-- Scope: el comportamiento observable del editor — abrir, editar, guardar y
+-- cerrar archivos .md en varias pestañas, la vista previa (Markdown + Mermaid)
+-- y el contrato de integración con Vera.
+--
+-- Includes:
+--   - Vocabulario compartido (Autor)
+--   - Modelo de documento y ciclo de vida multidocumento (documento.allium)
+--   - Superficies de edición y vista previa (vista-previa.allium)
+--   - Contrato de integración con Vera (vera.allium)
+--
+-- Excludes:
+--   - Elección de lenguaje/framework (Tauri, CodeMirror, marked, mermaid son
+--     detalle de implementación, no dominio)
+--   - Render concreto del Markdown y de los diagramas
+--   - El grafo y el manifiesto de identidades: viven en Vera, no en luca
+--
+-- Modulos:
+--   documento.allium     -> entidad Documento, Espacio y reglas de ciclo de vida
+--   vista-previa.allium   -> superficies de editor y vista previa
+--   vera.allium           -> contrato de lanzamiento e integración con Vera
+
+external entity Autor {
+    -- Quien escribe. luca es local y monousuario por ventana.
+    id: String
+}
+
+config {
+    max_edges: Integer = 2000
+    max_text_size: Integer = 10000000
+}

@@ -1,0 +1,61 @@
+-- allium: 3
+-- vera.allium — contrato de lanzamiento e integración con Vera
+--
+-- Scope: cómo Vera lanza luca y qué garantías de convivencia ofrece luca para
+-- un ensamble limpio, sin acoplarse al grafo ni a las identidades de Vera.
+--
+-- Dependencies: luca.allium, documento.allium
+
+use "./luca.allium" as luca
+use "./documento.allium" as documento
+
+external entity Vera {
+    -- Vera Desktop, que administra los borradores y los lanza en luca.
+    id: String
+}
+
+------------------------------------------------------------
+-- Lanzamiento desde Vera / "Abrir con…" del sistema
+------------------------------------------------------------
+
+surface LanzamientoVera {
+    facing vera: Vera
+    context espacio: documento/Espacio
+
+    exposes:
+        espacio.activos         -- Vera lanza, luca muestra el documento abierto
+
+    provides:
+        AutorAbreArchivo(archivo)
+
+    @guarantee VinculoPorTipoDeArchivo
+        -- v1: Vera lanza luca por la asociación de tipo del sistema operativo
+        -- (luca se declara editor de .md / text/markdown) con una ruta local.
+        -- Nada de esquemas vera:// ni deep-link todavía.
+
+    @guarantee AbrirSeComportaIgual
+        -- Un archivo abierto desde Vera entra por el mismo camino que una
+        -- apertura manual: añade una pestaña y no reemplaza lo abierto; reabrir
+        -- un .md ya abierto reutiliza su pestaña.
+
+    @guarantee BorradorDurable
+        -- El .md es un borrador temporal-durable que Vera crea y administra.
+        -- luca lo abre y lo guarda pero NUNCA lo borra. Guardar o cerrar luca
+        -- no escribe en el grafo: la reabsorción ocurre sólo al Aceptar cambios
+        -- en Vera.
+
+    @guarantee PreservaSintaxisDesconocida
+        -- luca preserva verbatim lo que no interpreta —incluido YAML o líneas
+        -- clave:: valor que escriba el usuario— y no inyecta metadatos ni
+        -- identidades de Vera en el Markdown.
+}
+
+------------------------------------------------------------
+-- Pendientes del ensamble (aún no decididos / no implementados)
+------------------------------------------------------------
+
+open question "CLI 'luca --wait <ruta>' para que Vera conozca la vida de la ventana (no determina la aceptación en Vera)."
+
+open question "Resolver rutas relativas de assets (../assets/img.png) en la vista previa, conservando la referencia literal al guardar. Pendiente de implementar."
+
+open question "Protocolo mayor con Vera (deep-link vera:// o JSON-RPC de abierto/cerrado) sólo cuando haya una necesidad concreta."

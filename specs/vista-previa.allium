@@ -1,0 +1,66 @@
+-- allium: 3
+-- vista-previa.allium — superficies de edición y vista previa
+--
+-- Scope: los contratos de frontera entre el Autor y luca — qué ve y qué puede
+-- hacer en el editor, y qué garantiza la vista previa (Markdown + Mermaid).
+--
+-- Dependencies: luca.allium, documento.allium
+
+use "./luca.allium" as luca
+use "./documento.allium" as documento
+
+------------------------------------------------------------
+-- Editor: barra de pestañas y operaciones sobre documentos
+------------------------------------------------------------
+
+surface Editor {
+    facing autor: luca/Autor
+    context espacio: documento/Espacio
+
+    exposes:
+        espacio.activos
+        for d in espacio.documentos:
+            d.ruta
+            d.sucio
+
+    provides:
+        AutorAbreArchivo(archivo)
+        AutorCreaDocumento(autor)
+        AutorEditaContenido(d, texto_nuevo)
+            when d in espacio.documentos
+        AutorGuarda(d)
+            when d in espacio.documentos and d.ruta != null
+        AutorGuardaComo(d, ruta_nueva)
+            when d in espacio.documentos
+        AutorCierraDocumento(d)
+            when d in espacio.documentos
+
+    @guarantee AperturaNoReemplaza
+        -- Abrir un documento nunca cierra ni reemplaza los ya abiertos; cada
+        -- pestaña conserva su ruta y su estado (cursor, scroll, historial).
+}
+
+------------------------------------------------------------
+-- Vista previa: Markdown → HTML, con Mermaid
+------------------------------------------------------------
+
+surface VistaPrevia {
+    facing autor: luca/Autor
+    context documento: documento/Documento
+
+    exposes:
+        documento.contenido     -- se renderiza como Markdown → HTML en vivo
+
+    @guarantee MermaidEsTexto
+        -- Los bloques ```mermaid se renderizan como vista previa, pero el
+        -- documento guarda siempre el texto fuente; luca no exporta ni
+        -- sustituye el diagrama por SVG.
+
+    @guarantee RenderOffline
+        -- marked y mermaid (con los motores ELK, tidy-tree y ZenUML) se cargan
+        -- desde recursos locales; el CDN es sólo respaldo.
+
+    @guidance
+        -- La vista previa es sólo una proyección: nunca es la fuente de verdad
+        -- ni altera el texto del documento.
+}

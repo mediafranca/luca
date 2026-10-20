@@ -44,19 +44,36 @@ cargo tauri build
 
 ## Estado
 
-MVP **multiplataforma** sobre [Tauri 2](https://tauri.app): el frontend es web
-(`ui/`, Markdown con `marked` + diagramas con `mermaid`), envuelto en una cáscara
-nativa ligera. Una sola base de código sirve para macOS, Windows, Linux y —vía
-Tauri 2— móvil. El editor es un `<textarea>` con preview en vivo.
+App **multiplataforma** sobre [Tauri 2](https://tauri.app): una sola base de
+código para macOS, Windows, Linux y —vía Tauri 2— móvil.
 
-- `marked` y `mermaid` se cargan desde CDN → requiere red. Vendorizar los dos
-  `.js` en `ui/` cuando importe el modo offline.
+- Editor **CodeMirror 6** con resaltado de Markdown; **multidocumento** por
+  pestañas (una apertura nueva no cierra las demás).
+- Vista previa en vivo: `marked` + **Mermaid 12 offline** con los motores ELK,
+  tidy-tree y ZenUML (CDN sólo de respaldo).
+- Abrir/guardar `.md` nativo, guardado atómico y aviso ante cambios externos.
 
 ## Estructura
 
-- `ui/` — frontend (HTML/CSS/JS, sin bundler).
+- `ui/` — frontend (HTML/CSS/JS; CodeMirror empaquetado con esbuild).
 - `src-tauri/` — cáscara nativa (Rust + Tauri).
+- `specs/` — especificación [Allium](https://github.com/mediafranca) del
+  comportamiento (ver abajo).
+- `scripts/vendor.mjs` — vendoriza mermaid/marked y empaqueta CodeMirror a
+  `ui/vendor/` (`npm run vendor`, también en `beforeDevCommand`).
 - `icon.svg` — fuente del icono; regenerar el set con `cargo tauri icon icon.png`.
+
+## Especificación (Allium)
+
+El comportamiento de luca está descrito en `specs/*.allium`, por consistencia
+con los demás repos de Media Franca:
+
+- `luca.allium` — módulo raíz (vocabulario y configuración).
+- `documento.allium` — modelo de documento y ciclo de vida multidocumento.
+- `vista-previa.allium` — superficies de editor y vista previa.
+- `vera.allium` — contrato de lanzamiento e integración con Vera.
+
+Validar con `allium check specs/`.
 
 ## Integración con Vera
 

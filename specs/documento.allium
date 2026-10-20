@@ -1,0 +1,187 @@
+-- allium: 3
+-- documento.allium — modelo de documento y ciclo de vida multidocumento
+--
+-- Scope: los documentos abiertos en luca y las reglas que los abren, editan,
+-- guardan y cierran. El contrato central con Vera: una apertura nueva nunca
+-- cierra ni reemplaza lo abierto, reabrir una ruta ya abierta reutiliza su
+-- documento, y siempre queda al menos un documento.
+--
+-- Excludes:
+--   - Render de la vista previa (vista-previa.allium)
+--   - Lanzamiento desde el sistema / "Abrir con…" de Vera (vera.allium)
+--
+-- Dependencies: luca.allium
+
+use "./luca.allium" as luca
+
+------------------------------------------------------------
+-- Documento y Espacio
+------------------------------------------------------------
+
+entity Documento {
+    -- Un .md abierto en una pestaña. Conserva su propia ruta y estado.
+    espacio: Espacio
+    ruta: String?                   -- null mientras no se ha guardado
+    contenido: String               -- el texto, tal cual lo escribe el Autor
+    sucio: Boolean                  -- hay cambios sin guardar
+    mtime_observado: Timestamp?     -- mtime del archivo cuando se leyó/guardó
+    activo: Boolean                 -- es la pestaña visible
+}
+
+entity Espacio {
+    -- La ventana de luca: el conjunto de documentos abiertos.
+    documentos: Documento with espacio = this
+    activos: documentos where activo = true
+}
+
+given {
+    espacio: Espacio
+}
+
+------------------------------------------------------------
+-- Invariantes del contrato multidocumento
+------------------------------------------------------------
+
+invariant SiempreUnDocumento {
+    -- Nunca hay cero documentos: cerrar el último abre uno vacío.
+    espacio.documentos.count >= 1
+}
+
+invariant UnSoloActivo {
+    -- Exactamente una pestaña visible.
+    espacio.activos.count = 1
+}
+
+invariant RutasUnicas {
+    -- Una ruta no se abre dos veces: reabrir reutiliza su documento.
+    for d in espacio.documentos:
+        (espacio.documentos where ruta = d.ruta and ruta != null).count <= 1
+}
+
+------------------------------------------------------------
+-- Abrir
+------------------------------------------------------------
+
+rule AbrirArchivo {
+    -- El Autor elige un archivo. Si ya está abierto, se activa su pestaña;
+    -- si no, se crea una pestaña nueva SIN cerrar las demás.
+    when: AutorAbreArchivo(archivo)
+
+    let abiertos = espacio.documentos where ruta = archivo.ruta
+
+    ensures:
+        if abiertos.count > 0:
+            for d in espacio.documentos:
+                d.activo = d in abiertos
+        else:
+            Documento.created(
+                espacio: espacio,
+                ruta: archivo.ruta,
+                contenido: archivo.contenido,
+                sucio: false,
+                mtime_observado: archivo.mtime,
+                activo: true
+            )
+            for existente in espacio.documentos:
+                existente.activo = false
+}
+
+------------------------------------------------------------
+-- Nuevo
+------------------------------------------------------------
+
+rule NuevoDocumento {
+    -- Crea una pestaña vacía y la activa, sin cerrar las demás.
+    when: AutorCreaDocumento(autor)
+
+    ensures:
+        Documento.created(
+            espacio: espacio,
+            ruta: null,
+            contenido: "",
+            sucio: false,
+            activo: true
+        )
+        for existente in espacio.documentos:
+            existente.activo = false
+}
+
+------------------------------------------------------------
+-- Editar
+------------------------------------------------------------
+
+rule EditarContenido {
+    -- Teclear marca el documento como sucio. luca no altera el texto.
+    when: AutorEditaContenido(documento, texto_nuevo)
+
+    ensures:
+        documento.contenido = texto_nuevo
+        documento.sucio = true
+}
+
+------------------------------------------------------------
+-- Guardar
+------------------------------------------------------------
+
+rule GuardarDocumento {
+    -- Guarda sobre la ruta vinculada. Escritura atómica y byte-fiel.
+    when: AutorGuarda(documento)
+
+    requires: documento.ruta != null
+
+    ensures:
+        documento.sucio = false
+        documento.mtime_observado = now
+
+    @guarantee EscrituraAtomicaYByteFiel
+        -- El contenido se escribe exactamente como está —sin normalizar ni
+        -- inyectar metadatos— mediante temporal + reemplazo atómico.
+
+    @guarantee NoPisaCambiosExternos
+        -- Si el archivo cambió fuera de luca desde la última lectura
+        -- (mtime distinto al observado, p.ej. porque Vera lo tocó), se pide
+        -- confirmación antes de sobrescribir.
+}
+
+rule GuardarComo {
+    -- Guarda en una ruta nueva y revincula el documento a esa ruta.
+    when: AutorGuardaComo(documento, ruta_nueva)
+
+    ensures:
+        documento.ruta = ruta_nueva
+        documento.sucio = false
+        documento.mtime_observado = now
+
+    @guidance
+        -- "Guardar como" crea una copia; no revincula la sesión de Vera, que
+        -- en la v1 sigue observando la ruta original.
+}
+
+------------------------------------------------------------
+-- Cerrar
+------------------------------------------------------------
+
+rule CerrarDocumento {
+    -- Cierra una pestaña. Si era la última, se abre una vacía.
+    when: AutorCierraDocumento(documento)
+
+    let restantes = espacio.documentos where this != documento
+
+    ensures:
+        not exists documento
+        if restantes.count = 0:
+            Documento.created(
+                espacio: espacio,
+                ruta: null,
+                contenido: "",
+                sucio: false,
+                activo: true
+            )
+
+    @guarantee ConfirmaDescarte
+        -- Si el documento tiene cambios sin guardar, cerrar pide confirmación.
+
+    @guarantee ActivaUnVecinoAlCerrar
+        -- Si se cierra el documento activo, queda activo uno de los restantes;
+        -- siempre hay exactamente un documento activo (UnSoloActivo).
+}
