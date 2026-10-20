@@ -527,6 +527,12 @@ function initTopbarButtons() {
     zenBtn.addEventListener("click", () => toggleZen());
   }
 
+  const pdfBtn = document.getElementById("pdfBtn");
+  if (pdfBtn) {
+    pdfBtn.innerHTML = icon("book-down");
+    pdfBtn.addEventListener("click", () => exportPdf());
+  }
+
   const prefsBtn = document.getElementById("prefsBtn");
   if (prefsBtn) {
     prefsBtn.innerHTML = icon("settings");
@@ -864,10 +870,6 @@ function buildTokenForms() {
   // 3. Formulario Tema Oscuro
   buildColorSection(tokenFormDark, "dark");
 
-  // Actualizar botones de esquema activo
-  document.querySelectorAll(".prefs-scheme-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.scheme === tokensState.scheme);
-  });
 }
 
 // Conectar pestañas del panel de preferencias
@@ -882,18 +884,6 @@ document.querySelectorAll(".prefs-tab-btn").forEach((btn) => {
     if (tabGen) tabGen.hidden = target !== "general";
     if (tabLight) tabLight.hidden = target !== "light";
     if (tabDark) tabDark.hidden = target !== "dark";
-  });
-});
-
-// Selector de esquema de la app
-document.querySelectorAll(".prefs-scheme-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    tokensState.scheme = btn.dataset.scheme;
-    saveTokens();
-    applyTokens();
-    document.querySelectorAll(".prefs-scheme-btn").forEach((b) => {
-      b.classList.toggle("active", b === btn);
-    });
   });
 });
 

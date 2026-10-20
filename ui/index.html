@@ -298,19 +298,6 @@
   .prefs-panel h2 { margin:0 0 14px; font-size:1.15rem; font-weight:600; color:var(--text);
     cursor:move; user-select:none; -webkit-user-select:none; }
   
-  .prefs-scheme-selector {
-    display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
-    padding:8px 12px; border:1px solid var(--rule); border-radius:8px; background:var(--bg);
-  }
-  .prefs-scheme-selector span { font-size:12.5px; color:var(--text); font-weight:500; }
-  .prefs-scheme-options { display:inline-flex; border:1px solid var(--rule); border-radius:6px; overflow:hidden; }
-  .prefs-scheme-btn {
-    border:0; background:transparent; color:var(--text-dim); padding:4px 10px; font-size:12px;
-    cursor:pointer; display:inline-flex; align-items:center; gap:4px;
-  }
-  .prefs-scheme-btn + .prefs-scheme-btn { border-left:1px solid var(--rule); }
-  .prefs-scheme-btn.active { background:var(--bg-raised); color:var(--text); font-weight:600; }
-  .prefs-scheme-btn .icon { width:13px; height:13px; }
 
   .prefs-tabs { display:flex; border-bottom:1px solid var(--rule); margin-bottom:14px; gap:4px; }
   .prefs-tab-btn {
@@ -347,6 +334,8 @@
   .prefs-actions button:hover { border-color:var(--text-dim); }
 
   /* ---- Impresión / Exportar PDF: sólo la vista previa del documento activo ---- */
+  /* Márgenes de página explícitos: el diálogo de impresión del webview parte de cero. */
+  @page { margin:20mm 18mm; }
   @media print {
     #topbar, #editors, #prefs, .table-modal, .preview-edit-table { display:none !important; }
     body { display:block; height:auto; background:#fff; color:#000; }
@@ -376,6 +365,7 @@
         <button type="button" data-theme-btn="light" title="Modo claro" aria-label="Modo claro"></button>
         <button type="button" data-theme-btn="dark" title="Modo oscuro" aria-label="Modo oscuro"></button>
       </div>
+      <button type="button" id="pdfBtn" class="topbar-btn" title="Exportar a PDF · ⌘E" aria-label="Exportar a PDF"></button>
       <button type="button" id="zen" class="topbar-btn" title="Modo zen (pantalla completa) · ⌘⇧Z" aria-label="Modo zen"></button>
       <button type="button" id="prefsBtn" class="topbar-btn" title="Configuración de diseño y tokens · ⌘," aria-label="Configuración"></button>
     </div>
@@ -388,15 +378,6 @@
   <div id="prefs" hidden>
     <div class="prefs-panel">
       <h2>Preferencias · Diseño</h2>
-
-      <div class="prefs-scheme-selector">
-        <span>Esquema activo:</span>
-        <div class="prefs-scheme-options">
-          <button type="button" class="prefs-scheme-btn" data-scheme="system">Sistema</button>
-          <button type="button" class="prefs-scheme-btn" data-scheme="light">Claro</button>
-          <button type="button" class="prefs-scheme-btn" data-scheme="dark">Oscuro</button>
-        </div>
-      </div>
 
       <div class="prefs-tabs">
         <button type="button" class="prefs-tab-btn active" data-tab="general">Generales</button>
