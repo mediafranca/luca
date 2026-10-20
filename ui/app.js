@@ -2,6 +2,8 @@
 // Patrón tomado de MarkChart: importar ESM, registrar motores de layout y
 // diagramas externos, y renderizar cada bloque con mermaid.render (que valida).
 
+import { createMarkdownEditor } from "./vendor/codemirror/editor.js";
+
 const LOCAL = "./vendor";
 const CDN = "https://cdn.jsdelivr.net/npm";
 
@@ -51,12 +53,15 @@ marked.use({
   },
 });
 
-const editor = document.getElementById("editor");
+const editorEl = document.getElementById("editor");
 const preview = document.getElementById("preview");
 let seq = 0; // ids únicos por render (mermaid inyecta <style id=...>)
+let ed; // editor CodeMirror, creado al final con el doc inicial
+let suppress = false; // true mientras cargamos un doc (no marcar sucio)
+let t; // timer del debounce de render
 
 async function render() {
-  preview.innerHTML = marked.parse(editor.value);
+  preview.innerHTML = marked.parse(ed.getDoc());
   for (const block of preview.querySelectorAll("pre.mermaid")) {
     const def = block.textContent;
     try {
@@ -83,8 +88,10 @@ async function setTitle() {
 }
 function markDirty() { if (!dirty) { dirty = true; setTitle(); } }
 
+function setDoc(text) { suppress = true; ed.setDoc(text); suppress = false; }
+
 async function loadPath(path) {
-  editor.value = await TAURI.core.invoke("read_file", { path });
+  setDoc(await TAURI.core.invoke("read_file", { path }));
   currentPath = path; dirty = false;
   render(); setTitle();
 }
@@ -101,19 +108,27 @@ async function saveFile(forceDialog = false) {
     });
     if (!path) return;
   }
-  await TAURI.core.invoke("write_file", { path, contents: editor.value });
+  await TAURI.core.invoke("write_file", { path, contents: ed.getDoc() });
   currentPath = path; dirty = false; setTitle();
 }
 function newFile() {
   if (dirty && !confirm("Hay cambios sin guardar. ¿Descartar?")) return;
-  editor.value = ""; currentPath = null; dirty = false; render(); setTitle();
+  setDoc(""); currentPath = null; dirty = false; render(); setTitle();
 }
 
-// ponytail: 150ms debounce. Un render viejo que siga corriendo escribe sobre
-// bloques que el innerHTML nuevo ya reemplazó; es inocuo para este MVP.
-let t;
-editor.addEventListener("input", () => { markDirty(); clearTimeout(t); t = setTimeout(render, 150); });
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { initMermaid(); render(); });
+// CodeMirror avisa cada cambio del doc. ponytail: 150ms debounce; un render
+// viejo que siga corriendo escribe sobre bloques que el innerHTML nuevo ya
+// reemplazó, lo cual es inocuo para este MVP.
+function onEdit() {
+  if (suppress) return;
+  markDirty();
+  clearTimeout(t);
+  t = setTimeout(render, 150);
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  ed.setDark(dark); initMermaid(); render();
+});
 
 if (TAURI) {
   addEventListener("keydown", (e) => {
@@ -138,7 +153,15 @@ flowchart LR
 
 // Apertura en frío: si Vera/Finder lanzaron luca con un archivo, cárgalo.
 const pending = TAURI ? await TAURI.core.invoke("take_opened_file") : null;
-editor.value = pending ? await TAURI.core.invoke("read_file", { path: pending }) : SAMPLE;
-if (pending) { currentPath = pending; }
+const initialDoc = pending ? await TAURI.core.invoke("read_file", { path: pending }) : SAMPLE;
+if (pending) currentPath = pending;
+
+ed = createMarkdownEditor({
+  parent: editorEl,
+  doc: initialDoc,
+  dark: matchMedia("(prefers-color-scheme: dark)").matches,
+  onChange: onEdit,
+});
 render();
 setTitle();
+ed.focus();

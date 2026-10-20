@@ -51,4 +51,17 @@ for (const [entry, name] of packages) {
   }
   console.log(`vendor: ${name} (${seen.size} archivos)`);
 }
-console.log(`vendor: ${count} archivos en ui/vendor/`);
+console.log(`vendor: ${count} archivos copiados en ui/vendor/`);
+
+// CodeMirror 6 usa imports "bare", así que se empaqueta con esbuild en vez de
+// copiarse. Un único editor.js ESM, sin dependencias externas.
+const esbuild = await import("esbuild");
+await esbuild.build({
+  entryPoints: [join(root, "ui", "editor.src.js")],
+  outfile: join(out, "codemirror", "editor.js"),
+  bundle: true,
+  format: "esm",
+  minify: true,
+  logLevel: "warning",
+});
+console.log("vendor: codemirror (editor.js empaquetado con esbuild)");

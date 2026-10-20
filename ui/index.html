@@ -10,10 +10,11 @@
   html, body { height: 100%; margin: 0; }
   body { display: grid; grid-template-columns: 1fr 1fr; background: var(--rule);
          font: 15px/1.6 -apple-system, system-ui, sans-serif; }
-  #editor, #preview { height: 100vh; overflow: auto; background: Canvas; }
-  #editor { border: 0; outline: 0; resize: none; padding: 20px 24px;
-            font: 14px/1.6 ui-monospace, Menlo, monospace; color: CanvasText; }
-  #preview { padding: 20px 28px; }
+  #editor, #preview { height: 100vh; background: Canvas; }
+  #editor { overflow: hidden; }
+  #preview { overflow: auto; padding: 20px 28px; }
+  .cm-editor { height: 100%; }
+  .cm-editor.cm-focused { outline: none; }
   pre, code { font-family: ui-monospace, Menlo, monospace; }
   #preview pre:not(.mermaid) { background: rgba(127,127,127,.12); padding: 12px; border-radius: 8px; overflow-x: auto; }
   pre.mermaid { background: transparent; text-align: center; }
@@ -26,7 +27,7 @@
 </style>
 </head>
 <body>
-  <textarea id="editor" spellcheck="false"></textarea>
+  <div id="editor"></div>
   <div id="preview"></div>
   <script type="module" src="app.js"></script>
 </body>
