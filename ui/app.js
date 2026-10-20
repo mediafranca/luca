@@ -1001,7 +1001,7 @@ initTopbarButtons();
 applyMode(mode0);
 toggleZen(zen0 === "on");
 
-const SAMPLE = `# Luca — Editor Markdown Soberano
+const SAMPLE = `# Luca
 
 > *«Una manera de entender la escritura desde su forma, sus proporciones y el cuidado de sus trazos.»*  
 > — Fra Luca Pacioli, *Divina proportione* (1509)
@@ -1010,16 +1010,21 @@ Luca es un editor Markdown local del ecosistema **MediaFranca**, diseñado para 
 
 ---
 
-## Flujo de Trabajo en MediaFranca
+## Flujo de Trabajo
 
 El siguiente diagrama ilustra la arquitectura de creación, verificación y publicación soberana:
 
 \`\`\`mermaid
 flowchart LR
-    A["Borrador local\n(Markdown en Luca)"] --> B["Edición y Tablas\n(CM6 + Editor Vera)"]
-    B --> C["Vista Previa\n(marked + Mermaid 12)"]
-    C --> D["Guardado atómico\n(Archivo .md en disco)"]
-    D --> E["Publicación\n(Ecosistema Vera)"]
+    A["Borrador local
+(Markdown en Luca)"] --> B["Edición y Tablas
+(CM6 + Editor Vera)"]
+    B --> C["Vista Previa
+(marked + Mermaid 12)"]
+    C --> D["Guardado atómico
+(Archivo .md en disco)"]
+    D --> E["Publicación
+(Ecosistema Vera)"]
     E -.->|Revisión externa| A
 \`\`\`
 
