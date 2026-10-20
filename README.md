@@ -4,10 +4,7 @@
 
 # Luca
 
-**El editor Markdown de [Vera](https://github.com/mediafranca)** — ecosistema **MediaFranca**
-
-<img src="assets/raised-fist.svg" width="16" alt=""> &nbsp;Aplicación soberana · [EUPL 1.2](LICENSE)
-
+**El editor Markdown para [Vera](https://github.com/mediafranca)**
 </div>
 
 Luca es un editor Markdown sencillo y rápido para elaborar el texto de una página
@@ -110,9 +107,15 @@ una necesidad concreta.
 
 Las contribuciones son bienvenidas: ver [CONTRIBUTING.md](CONTRIBUTING.md).
 
+<div align="center">
+<img src="assets/raised-fist.svg" width="70" alt="Puño alzado"><br>Aplicación soberana
+<br><sub>Puño alzado: Eugenio Hansen, OFS — trabajo propio,
+<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>, vía
+<a href="https://commons.wikimedia.org/w/index.php?curid=65787095">Wikimedia Commons</a>.</sub>
+</div>
+
 ## Autoría y licencia
 
 Luca es obra de [Herbert Spencer González](https://github.com/hspencer), dentro
-de MediaFranca. Publicado bajo la **Licencia Pública de la Unión Europea
-(EUPL 1.2)**: copyleft fuerte —en el espíritu de Vera (GPL-3.0)— pero más fina,
-con texto legal en español y compatible con GPL-3.0. Ver [LICENSE](LICENSE).
+de MediaFranca. Publicado bajo la [Licencia Pública de la Unión Europea
+(EUPL 1.2)](LICENSE).
