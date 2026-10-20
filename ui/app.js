@@ -1052,12 +1052,15 @@ flowchart LR
 - [x] Arquitectura multidocumento por pestañas con editor independiente por archivo
 - [x] Barra de herramientas de formato tipográfico, bloques y enlaces
 - [x] Editor visual de tablas Markdown reciclado del repositorio Vera
-- [x] Tokens y temas independientes (Claro y Oscuro de Vera) con selector de esquema
+- [x] Tokens y temas independientes (Claro y Oscuro de Vera), exportables e importables como JSON
+- [x] Tipografía y ancho de columna independientes para código y lectura
 - [x] Guardado atómico en disco con detección de cambios externos por mtime
+- [x] Edición por bloques directamente sobre la vista previa (*WYSIWYG*)
+- [x] Imágenes y recursos locales por ruta relativa al documento
+- [x] Exportación a PDF con márgenes de página
+- [x] Apertura de archivos \`.md\` desde Vera y el sistema en macOS, Linux y Windows
 
 ### Próximos pasos
-- [ ] Edición interactiva directa sobre la vista previa (*WYSIWYG*)
-- [ ] Resolución de rutas relativas locales para imágenes y recursos vinculados
 - [ ] Resaltado de sintaxis enriquecido dentro de bloques Mermaid
 - [ ] Paquetes de iconos vectoriales adicionales para diagramas
 `;
