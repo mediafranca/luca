@@ -81,6 +81,7 @@ async function render() {
 const TAURI = window.__TAURI__;
 let currentPath = null;
 let dirty = false;
+let lastMtime = null; // mtime observado del archivo vinculado (cambios externos)
 
 const baseName = (p) => (p ? p.split(/[\\/]/).pop() : "sin título");
 async function setTitle() {
@@ -93,6 +94,7 @@ function setDoc(text) { suppress = true; ed.setDoc(text); suppress = false; }
 async function loadPath(path) {
   setDoc(await TAURI.core.invoke("read_file", { path }));
   currentPath = path; dirty = false;
+  lastMtime = await TAURI.core.invoke("stat", { path });
   render(); setTitle();
 }
 async function openFile() {
@@ -101,14 +103,20 @@ async function openFile() {
 }
 async function saveFile(forceDialog = false) {
   let path = currentPath;
-  if (forceDialog || !path) {
+  const isNew = forceDialog || !path;
+  if (isNew) {
     path = await TAURI.dialog.save({
       defaultPath: currentPath ?? "sin título.md",
       filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
     });
     if (!path) return;
+  } else {
+    // ¿cambió fuera de luca (p.ej. Vera) desde que lo leímos? No pisar en silencio.
+    const cur = await TAURI.core.invoke("stat", { path });
+    if (cur !== null && lastMtime !== null && cur !== lastMtime &&
+        !confirm("El archivo cambió fuera de luca. ¿Sobrescribir?")) return;
   }
-  await TAURI.core.invoke("write_file", { path, contents: ed.getDoc() });
+  lastMtime = await TAURI.core.invoke("write_file", { path, contents: ed.getDoc() });
   currentPath = path; dirty = false; setTitle();
 }
 function newFile() {
@@ -154,7 +162,7 @@ flowchart LR
 // Apertura en frío: si Vera/Finder lanzaron luca con un archivo, cárgalo.
 const pending = TAURI ? await TAURI.core.invoke("take_opened_file") : null;
 const initialDoc = pending ? await TAURI.core.invoke("read_file", { path: pending }) : SAMPLE;
-if (pending) currentPath = pending;
+if (pending) { currentPath = pending; lastMtime = await TAURI.core.invoke("stat", { path: pending }); }
 
 ed = createMarkdownEditor({
   parent: editorEl,

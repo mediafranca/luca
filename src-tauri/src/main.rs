@@ -13,9 +13,30 @@ fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
+// Guardado atómico: escribe a un temporal y lo renombra sobre el destino
+// (rename es atómico en el mismo volumen). Devuelve el mtime resultante en ms.
 #[tauri::command]
-fn write_file(path: String, contents: String) -> Result<(), String> {
-    std::fs::write(&path, contents).map_err(|e| e.to_string())
+fn write_file(path: String, contents: String) -> Result<u64, String> {
+    let tmp = format!("{path}.luca-tmp");
+    std::fs::write(&tmp, contents).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    mtime_ms(&path)
+}
+
+// mtime en ms desde epoch, para detectar cambios externos antes de sobrescribir.
+#[tauri::command]
+fn stat(path: String) -> Option<u64> {
+    mtime_ms(&path).ok()
+}
+
+fn mtime_ms(path: &str) -> Result<u64, String> {
+    let modified = std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .map_err(|e| e.to_string())?;
+    modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -27,7 +48,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Pending(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![read_file, write_file, take_opened_file])
+        .invoke_handler(tauri::generate_handler![read_file, write_file, stat, take_opened_file])
         .build(tauri::generate_context!())
         .expect("error while running luca")
         .run(move |app, event| {
