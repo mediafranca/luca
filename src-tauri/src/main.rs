@@ -50,6 +50,41 @@ fn take_opened_file(state: tauri::State<Pending>) -> Option<String> {
     state.0.lock().unwrap().take()
 }
 
+// Exportar a PDF. En macOS Tauri sustituye `window.print()` por una impresión
+// nativa cuyo NSPrintInfo lleva márgenes cero, y WebKit pagina con el área
+// imprimible del sistema (ignora `@page`): el texto llegaba al borde de la hoja.
+// Aquí se imprime igual que wry, pero con márgenes reales. En otras plataformas
+// devuelve error y el frontend usa `window.print()`.
+#[tauri::command]
+fn print_with_margins(webview: tauri::Webview) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        webview
+            .with_webview(|w| unsafe {
+                use objc2::runtime::{AnyObject, Sel};
+                use objc2::{class, msg_send};
+                let wk = w.inner() as *mut AnyObject;
+                let info: *mut AnyObject = msg_send![class!(NSPrintInfo), sharedPrintInfo];
+                // 20 mm arriba/abajo y 18 mm a los lados, en puntos (1 mm = 72/25.4 pt).
+                let (v, h): (f64, f64) = (20.0 * 72.0 / 25.4, 18.0 * 72.0 / 25.4);
+                let _: () = msg_send![info, setTopMargin: v];
+                let _: () = msg_send![info, setBottomMargin: v];
+                let _: () = msg_send![info, setLeftMargin: h];
+                let _: () = msg_send![info, setRightMargin: h];
+                let op: *mut AnyObject = msg_send![wk, printOperationWithPrintInfo: info];
+                let _: () = msg_send![op, setCanSpawnSeparateThread: true];
+                let window: *mut AnyObject = msg_send![wk, window];
+                let _: () = msg_send![op, runOperationModalForWindow: window, delegate: std::ptr::null_mut::<AnyObject>(), didRunSelector: None::<Sel>, contextInfo: std::ptr::null_mut::<std::ffi::c_void>()];
+            })
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = webview;
+        Err("sin impresión nativa en esta plataforma".into())
+    }
+}
+
 // Menú nativo. Los ítems propios emiten su id al frontend (evento "menu"); los
 // predefinidos (deshacer/copiar/pegar, salir…) los maneja el sistema.
 fn build_menu(app: &tauri::App) -> tauri::Result<()> {
@@ -122,7 +157,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Pending(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![read_file, write_file, stat, take_opened_file])
+        .invoke_handler(tauri::generate_handler![read_file, write_file, stat, take_opened_file, print_with_margins])
         .setup(|app| {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             if let Some(path) = file_argument::first_local_file_argument(std::env::args_os()) {

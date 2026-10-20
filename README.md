@@ -38,6 +38,7 @@ xattr -cr /Applications/Luca.app
 - Varios documentos en pestañas. Guardado seguro y aviso si otro programa
   cambió el archivo.
 - Exportar a PDF.
+- Exportar e importar los tokens de diseño como JSON desde Preferencias.
 - Tipografía y colores configurables (`⌘,`), claro y oscuro.
 
 ![Luca](./assets/luca-screenshot.png)

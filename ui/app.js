@@ -546,7 +546,14 @@ function initTopbarButtons() {
 
 // Exportar a PDF: @media print en index.html deja sólo la vista previa activa;
 // el diálogo de impresión de macOS ofrece «Guardar como PDF».
-function exportPdf() { window.print(); }
+// macOS imprime con márgenes reales desde Rust; el resto de plataformas usa el diálogo del webview.
+async function exportPdf() {
+  // En macOS los márgenes los pone NSPrintInfo; @page se anula para que no se sumen.
+  const st = document.createElement("style");
+  st.textContent = "@page { margin:0 }";
+  document.head.append(st);
+  try { await TAURI.core.invoke("print_with_margins"); } catch { st.remove(); window.print(); }
+}
 
 // ---------- Sistema de Diseño y Tokens (Vera) ----------
 // Las tipografías, medidas y anchos son generales.
@@ -633,8 +640,7 @@ const COLOR_TOKENS_META = [
   { name: "--preview-text", label: "Texto de vista previa" },
 ];
 
-function loadTokens() {
-  const held = localStorage.getItem("luca.tokens");
+function loadTokens(held = localStorage.getItem("luca.tokens")) {
   if (!held) {
     return {
       general: { ...VERA_DEFAULTS.general },
@@ -909,6 +915,31 @@ function resetTokens() {
   buildTokenForms();
 }
 
+// Exportar/importar todos los tokens (código, lectura, interfaz, claro y oscuro) como JSON.
+// El esquema claro/oscuro es una preferencia del dispositivo y no viaja con el archivo.
+const TOKENS_FILTER = [{ name: "Tokens de Luca", extensions: ["json"] }];
+
+async function exportTokens() {
+  const path = await TAURI.dialog.save({ defaultPath: "luca-tokens.json", filters: TOKENS_FILTER });
+  if (!path) return;
+  const { general, light, dark } = tokensState;
+  await TAURI.core.invoke("write_file", { path, contents: JSON.stringify({ general, light, dark }, null, 2) + "\n" });
+}
+
+async function importTokens() {
+  const path = await TAURI.dialog.open({ filters: TOKENS_FILTER });
+  if (typeof path !== "string") return;
+  const text = await TAURI.core.invoke("read_file", { path });
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { parsed = null; }
+  if (!parsed || typeof parsed !== "object") { alert("El archivo no contiene tokens de Luca válidos."); return; }
+  // loadTokens completa con los valores de Vera y entiende el formato plano antiguo.
+  tokensState = { ...loadTokens(text), scheme: tokensState.scheme };
+  saveTokens();
+  applyTokens();
+  buildTokenForms();
+}
+
 if (prefsEl) {
   // Arrastre del panel desde su título; queda donde se suelte (dentro de la ventana).
   prefsEl.querySelector(".prefs-panel h2")?.addEventListener("pointerdown", (e) => {
@@ -926,6 +957,8 @@ if (prefsEl) {
   });
   document.getElementById("prefsClose")?.addEventListener("click", closePrefs);
   document.getElementById("prefsReset")?.addEventListener("click", resetTokens);
+  document.getElementById("prefsExport")?.addEventListener("click", exportTokens);
+  document.getElementById("prefsImport")?.addEventListener("click", importTokens);
   mermaidSel?.addEventListener("change", () => {
     try { localStorage.setItem("luca.mermaidTheme", mermaidSel.value); } catch {}
     initMermaid();

@@ -332,6 +332,7 @@
   .prefs-actions button { font:inherit; font-size:13px; padding:6px 15px; border:1px solid var(--rule);
     border-radius:7px; background:var(--bg); color:var(--text); cursor:pointer; }
   .prefs-actions button:hover { border-color:var(--text-dim); }
+  .prefs-actions > div { display:flex; gap:8px; flex-wrap:wrap; }
 
   /* ---- Impresión / Exportar PDF: sólo la vista previa del documento activo ---- */
   /* Márgenes de página explícitos: el diálogo de impresión del webview parte de cero. */
@@ -344,6 +345,8 @@
     .doc-preview[hidden] { display:none !important; }
     .doc-preview:not([hidden]) { display:block !important; height:auto; overflow:visible; padding:0;
       max-width:var(--content-width); margin:0 auto; }
+    /* El primer título no suma su margen (1.6em) al margen de la página. */
+    .doc-preview > :first-child { margin-top:0; }
     /* Tablas, diagramas, código e imágenes no se parten en el salto de página;
        un título no queda huérfano al pie. */
     .preview-table-wrapper, table, pre, img, .block-edit { break-inside:avoid; page-break-inside:avoid; }
@@ -408,7 +411,11 @@
       </div>
 
       <div class="prefs-actions">
-        <button type="button" id="prefsReset">Restablecer valores de Vera</button>
+        <div>
+          <button type="button" id="prefsExport" title="Guardar todos los tokens en un archivo JSON">Exportar…</button>
+          <button type="button" id="prefsImport" title="Cargar tokens desde un archivo JSON">Importar…</button>
+          <button type="button" id="prefsReset">Restablecer valores de Vera</button>
+        </div>
         <button type="button" id="prefsClose">Cerrar</button>
       </div>
     </div>
