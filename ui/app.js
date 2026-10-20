@@ -218,6 +218,15 @@ function toggleZen(force) {
 for (const b of document.querySelectorAll("#modebar button[data-mode]"))
   b.addEventListener("click", () => applyMode(b.dataset.mode));
 document.getElementById("zen").addEventListener("click", () => toggleZen());
+document.getElementById("zenexit").addEventListener("click", () => toggleZen(false));
+
+// Esc sale del zen SIEMPRE: en fase de captura, antes de que CodeMirror lo tome.
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.body.dataset.zen === "on") {
+    e.preventDefault(); e.stopPropagation();
+    toggleZen(false);
+  }
+}, true);
 
 addEventListener("keydown", (e) => {
   const cmd = e.metaKey || e.ctrlKey;
@@ -225,7 +234,6 @@ addEventListener("keydown", (e) => {
   else if (cmd && e.key === "1") { e.preventDefault(); applyMode("source"); }
   else if (cmd && e.key === "2") { e.preventDefault(); applyMode("split"); }
   else if (cmd && e.key === "3") { e.preventDefault(); applyMode("rendered"); }
-  else if (e.key === "Escape" && document.body.dataset.zen === "on") { toggleZen(false); }
 });
 
 // Estado inicial, recordado por visor (localStorage es una comodidad local).
@@ -234,7 +242,7 @@ try { mode0 = localStorage.getItem("luca.mode") || "split"; zen0 = localStorage.
 applyMode(mode0);
 document.body.dataset.zen = zen0;
 
-const SAMPLE = `# luca
+const SAMPLE = `# Luca
 
 Editor Markdown mínimo y rápido, con **Mermaid offline** (mermaid 12 + ELK, tidy-tree y ZenUML).
 

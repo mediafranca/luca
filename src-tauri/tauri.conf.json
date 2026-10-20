@@ -13,10 +13,9 @@
     "windows": [
       {
         "label": "main",
-        "title": "luca",
-        "width": 900,
-        "height": 560,
-        "titleBarStyle": "Overlay"
+        "title": "Luca",
+        "width": 960,
+        "height": 620
       }
     ],
     "security": {

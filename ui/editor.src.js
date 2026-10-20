@@ -1,17 +1,40 @@
 // Fuente del editor CodeMirror 6. NO se carga directo en el navegador (usa
 // imports "bare"): esbuild la empaqueta a ui/vendor/codemirror/editor.js desde
 // scripts/vendor.mjs. Expone una API mínima para app.js.
+//
+// Los colores y tipografías salen de los tokens de Vera (variables CSS en
+// :root), así que el claro/oscuro cambia solo con el sistema.
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
 
-// Tema claro: transparente para heredar el fondo de la ventana.
-const lightTheme = EditorView.theme({
-  "&": { backgroundColor: "transparent", height: "100%" },
-  ".cm-scroller": { fontFamily: "ui-monospace, Menlo, monospace", lineHeight: "1.6" },
-  ".cm-gutters": { backgroundColor: "transparent", border: "none" },
-});
+function editorTheme(dark) {
+  return EditorView.theme(
+    {
+      "&": { color: "var(--text)", backgroundColor: "var(--bg)" },
+      ".cm-content": { caretColor: "var(--accent)", padding: "20px 24px" },
+      ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
+      ".cm-gutters": { backgroundColor: "var(--bg)", color: "var(--text-dim)", border: "none" },
+      ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--text)" },
+      ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--line-height, 1.6)" },
+    },
+    { dark },
+  );
+}
+
+const highlight = HighlightStyle.define([
+  { tag: [t.heading, t.heading1, t.heading2, t.heading3], color: "var(--text)", fontWeight: "700" },
+  { tag: t.strong, fontWeight: "700" },
+  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: [t.link, t.url], color: "var(--accent)" },
+  { tag: [t.monospace, t.literal], color: "var(--text-dim)" },
+  { tag: t.quote, color: "var(--text-dim)", fontStyle: "italic" },
+  { tag: [t.list, t.processingInstruction], color: "var(--accent)" },
+]);
+
+const themeFor = (dark) => [editorTheme(dark), syntaxHighlighting(highlight)];
 
 export function createMarkdownEditor({ parent, doc, dark, onChange }) {
   const themeComp = new Compartment();
@@ -23,8 +46,7 @@ export function createMarkdownEditor({ parent, doc, dark, onChange }) {
         basicSetup,
         markdown({ base: markdownLanguage }),
         EditorView.lineWrapping,
-        lightTheme,
-        themeComp.of(dark ? oneDark : []),
+        themeComp.of(themeFor(dark)),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange(u.state.doc.toString());
         }),
@@ -35,7 +57,7 @@ export function createMarkdownEditor({ parent, doc, dark, onChange }) {
     getDoc: () => view.state.doc.toString(),
     setDoc: (text) =>
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
-    setDark: (d) => view.dispatch({ effects: themeComp.reconfigure(d ? oneDark : []) }),
+    setDark: (d) => view.dispatch({ effects: themeComp.reconfigure(themeFor(d)) }),
     focus: () => view.focus(),
   };
 }

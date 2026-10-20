@@ -3,74 +3,132 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>luca</title>
+<title>Luca</title>
 <style>
-  :root { color-scheme: light dark; --rule: rgba(127,127,127,.25); }
+  /* Fuentes empaquetadas (IBM Plex, SIL OFL) — ver ui/fonts/LICENSE-IBM-Plex.txt */
+  @font-face { font-family:'IBM Plex Sans'; src:url('fonts/plex-sans-variable.woff2') format('woff2-variations');
+               font-weight:100 700; font-style:normal; font-display:swap; }
+  @font-face { font-family:'IBM Plex Sans'; src:url('fonts/plex-sans-variable-italic.woff2') format('woff2-variations');
+               font-weight:100 700; font-style:italic; font-display:swap; }
+  @font-face { font-family:'IBM Plex Mono'; src:url('fonts/plex-mono-400.woff2') format('woff2');
+               font-weight:400; font-style:normal; font-display:swap; }
+  @font-face { font-family:'IBM Plex Mono'; src:url('fonts/plex-mono-600.woff2') format('woff2');
+               font-weight:600; font-style:normal; font-display:swap; }
+
+  /* Tokens de Vera (claro / oscuro) */
+  :root {
+    color-scheme: light dark;
+    --bg:#e6ebe9; --bg-raised:#e8ebf1; --text:#454f6e; --text-dim:#6b7080;
+    --rule:#d1d1d2; --accent:#a84a0b;
+    --text-size:16px; --line-height:1.55; --content-width:45em;
+    --font-body:'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono:'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#2e0024; --bg-raised:#351725; --text:#cde0cf; --text-dim:#a4a696;
+            --rule:#24001c; --accent:#ee895d; }
+  }
+
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { display: grid; grid-template-rows: auto auto 1fr; height: 100vh;
-         font: 15px/1.6 -apple-system, system-ui, sans-serif; background: Canvas; }
+  html, body { height:100%; margin:0; }
+  body { display:grid; grid-template-rows:auto 1fr; height:100vh; background:var(--bg);
+         color:var(--text); font-family:var(--font-body); font-size:var(--text-size);
+         line-height:var(--line-height); }
 
-  /* Barra de pestañas */
-  #tabs { display: flex; align-items: stretch; gap: 1px; overflow-x: auto;
-          background: var(--rule); border-bottom: 1px solid var(--rule); }
-  .tab { display: flex; align-items: center; gap: 6px; padding: 6px 10px;
-         background: Canvas; cursor: default; white-space: nowrap; font-size: 13px;
-         max-width: 240px; opacity: .6; }
-  .tab.active { opacity: 1; }
-  .tab .label { overflow: hidden; text-overflow: ellipsis; }
-  .tab .close { border: 0; background: transparent; color: inherit; cursor: pointer;
-                font-size: 15px; line-height: 1; padding: 0 2px; opacity: .5; }
-  .tab .close:hover { opacity: 1; }
+  /* ---- Barra superior (pestañas + modos) ---- */
+  #topbar { background:var(--bg-raised); border-bottom:1px solid var(--rule); }
+  #tabs { display:flex; align-items:stretch; overflow-x:auto; }
+  .tab { display:flex; align-items:center; gap:7px; padding:7px 12px; cursor:default;
+         white-space:nowrap; max-width:240px; font-family:var(--font-body); font-size:12.5px;
+         color:var(--text-dim); border-bottom:2px solid transparent; }
+  .tab.active { color:var(--text); border-bottom-color:var(--accent); }
+  .tab .label { overflow:hidden; text-overflow:ellipsis; }
+  .tab .close { border:0; background:transparent; color:inherit; cursor:pointer;
+                font-size:16px; line-height:1; padding:0 2px; opacity:.45; }
+  .tab .close:hover { opacity:1; color:var(--accent); }
 
-  /* Barra de modos */
-  #modebar { display: flex; align-items: center; gap: 6px; padding: 5px 10px;
-             border-bottom: 1px solid var(--rule); font-size: 12px; }
-  #modebar button { border: 1px solid var(--rule); background: Canvas; color: inherit;
-                    padding: 3px 11px; border-radius: 6px; cursor: pointer; opacity: .55; }
-  #modebar button.active { opacity: 1; font-weight: 600; }
-  #modebar .spacer { flex: 1; }
+  #modebar { display:flex; align-items:center; gap:10px; padding:7px 12px; font-family:var(--font-body); }
+  .seg { display:inline-flex; border:1px solid var(--rule); border-radius:7px; overflow:hidden; }
+  .seg button { font:inherit; font-size:12px; padding:4px 13px; border:0; background:transparent;
+                color:var(--text-dim); cursor:default; }
+  .seg button + button { border-left:1px solid var(--rule); }
+  .seg button.active { background:var(--bg); color:var(--text); font-weight:600; }
+  #modebar .spacer { flex:1; }
+  #zen { font:inherit; font-size:12px; padding:4px 11px; border:1px solid transparent;
+         border-radius:7px; background:transparent; color:var(--text-dim); cursor:pointer; }
+  #zen:hover { color:var(--text); border-color:var(--rule); }
 
-  /* Área de trabajo: editor | preview */
-  #workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
-               background: var(--rule); min-height: 0; }
-  body[data-mode="source"]   #previews { display: none; }
-  body[data-mode="source"]   #workspace { grid-template-columns: 1fr; }
-  body[data-mode="rendered"] #editors  { display: none; }
-  body[data-mode="rendered"] #workspace { grid-template-columns: 1fr; }
-  body[data-zen="on"] #tabs, body[data-zen="on"] #modebar { display: none; }
-  #editors, #previews { position: relative; min-height: 0; background: Canvas; overflow: hidden; }
-  .doc-editor { height: 100%; }
-  .doc-editor[hidden], .doc-preview[hidden] { display: none; }
-  .doc-preview { height: 100%; overflow: auto; padding: 20px 28px; }
-  .cm-editor { height: 100%; }
-  .cm-editor.cm-focused { outline: none; }
+  /* ---- Área de trabajo ---- */
+  #workspace { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule); min-height:0; }
+  #editors, #previews { position:relative; min-height:0; background:var(--bg); overflow:hidden; }
+  .doc-editor { height:100%; }
+  .doc-editor[hidden], .doc-preview[hidden] { display:none; }
+  .cm-editor { height:100%; }
+  .cm-editor.cm-focused { outline:none; }
 
-  /* Preview */
-  pre, code { font-family: ui-monospace, Menlo, monospace; }
-  .doc-preview pre:not(.mermaid) { background: rgba(127,127,127,.12); padding: 12px; border-radius: 8px; overflow-x: auto; }
-  pre.mermaid { background: transparent; text-align: center; }
-  pre.mermaid-error { background: rgba(220,60,60,.12); color: #c0392b; padding: 10px 12px;
-                      border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
-  img { max-width: 100%; }
-  blockquote { border-left: 3px solid var(--rule); margin: 0; padding-left: 1em; opacity: .85; }
-  table { border-collapse: collapse; } td, th { border: 1px solid var(--rule); padding: 4px 8px; }
-  @media (max-width: 640px) { #workspace { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+  body[data-mode="source"]   #previews { display:none; }
+  body[data-mode="source"]   #workspace { grid-template-columns:1fr; }
+  body[data-mode="rendered"] #editors  { display:none; }
+  body[data-mode="rendered"] #workspace { grid-template-columns:1fr; }
+
+  /* ---- Vista previa: prosa con medida controlada ---- */
+  .doc-preview { height:100%; overflow:auto; padding:2.4rem clamp(1.2rem, 5vw, 3rem); background:var(--bg); }
+  .doc-preview > * { max-width:var(--content-width); margin-left:auto; margin-right:auto; }
+  .doc-preview h1, .doc-preview h2, .doc-preview h3 { line-height:1.18; font-weight:600;
+    letter-spacing:-.01em; margin:1.6em 0 .5em; }
+  .doc-preview h1 { font-size:1.8rem; } .doc-preview h2 { font-size:1.4rem; } .doc-preview h3 { font-size:1.15rem; }
+  .doc-preview p, .doc-preview ul, .doc-preview ol, .doc-preview blockquote { margin:0 auto .9em; }
+  .doc-preview a { color:var(--accent); text-underline-offset:2px; }
+  .doc-preview code { font-family:var(--font-mono); font-size:.9em; }
+  .doc-preview pre:not(.mermaid) { font-family:var(--font-mono); background:var(--bg-raised);
+    padding:14px 16px; border-radius:8px; overflow-x:auto; }
+  pre.mermaid { background:transparent; text-align:center; }
+  pre.mermaid-error { background:var(--bg-raised); color:var(--accent);
+    padding:10px 14px; border-radius:8px; white-space:pre-wrap; font-size:.85em; }
+  .doc-preview img { max-width:100%; }
+  .doc-preview blockquote { border-left:3px solid var(--rule); padding-left:1em; color:var(--text-dim); }
+  .doc-preview table { border-collapse:collapse; }
+  .doc-preview td, .doc-preview th { border:1px solid var(--rule); padding:5px 9px; }
+
+  /* ---- Modo zen ---- */
+  /* La barra se retrae; reaparece al acercar el cursor al borde superior. */
+  body[data-zen="on"] #topbar { position:fixed; top:0; left:0; right:0; z-index:40;
+    transform:translateY(-100%); transition:transform .18s ease; }
+  body[data-zen="on"] #topbar:hover { transform:none; }
+  body[data-zen="on"] #topbar::after { content:""; position:absolute; left:0; right:0; top:100%; height:18px; }
+  /* En zen, la medida se centra también en el editor (foco de escritura). */
+  body[data-zen="on"] .cm-content { max-width:var(--content-width); margin:0 auto; }
+
+  /* Salida visible del zen, siempre a mano. */
+  #zenexit { display:none; }
+  body[data-zen="on"] #zenexit { display:block; position:fixed; top:12px; right:14px; z-index:45;
+    font-family:var(--font-body); font-size:11.5px; letter-spacing:.02em; padding:5px 11px;
+    border:1px solid var(--rule); border-radius:999px; background:var(--bg-raised); color:var(--text-dim);
+    cursor:pointer; opacity:.4; transition:opacity .15s; }
+  body[data-zen="on"] #zenexit:hover { opacity:1; color:var(--text); }
+
+  @media (max-width:640px) { #workspace { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
+  @media (prefers-reduced-motion: reduce) { body[data-zen="on"] #topbar { transition:none; } }
 </style>
 </head>
 <body>
-  <div id="tabs"></div>
-  <div id="modebar">
-    <button data-mode="source">source</button>
-    <button data-mode="split">split</button>
-    <button data-mode="rendered">rendered</button>
-    <span class="spacer"></span>
-    <button id="zen" title="Modo zen (oculta las barras) · ⌘⇧Z">zen</button>
+  <div id="topbar">
+    <div id="tabs"></div>
+    <div id="modebar">
+      <div class="seg">
+        <button data-mode="source">source</button>
+        <button data-mode="split">split</button>
+        <button data-mode="rendered">rendered</button>
+      </div>
+      <span class="spacer"></span>
+      <button id="zen" title="Modo zen · ⌘⇧Z">zen</button>
+    </div>
   </div>
   <div id="workspace">
     <div id="editors"></div>
     <div id="previews"></div>
   </div>
+  <button id="zenexit" title="Salir del modo zen · Esc">esc · salir de zen</button>
   <script type="module" src="app.js"></script>
 </body>
 </html>

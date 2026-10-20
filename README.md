@@ -36,19 +36,19 @@ disponible para otras herramientas.
 
 ## Funcionalidades actuales
 
-- ✍️ Editor **CodeMirror 6** con resaltado de sintaxis Markdown.
-- 🗂️ **Multidocumento** por pestañas: abrir un archivo no cierra los demás, y
+- Editor **CodeMirror 6** con resaltado de sintaxis Markdown.
+- **Multidocumento** por pestañas: abrir un archivo no cierra los demás, y
   reabrir uno ya abierto reutiliza su pestaña.
-- 🪟 Modos de vista **source · split · rendered** y **modo zen** que oculta las
-  barras (atajos `⌘1`/`⌘2`/`⌘3` y `⌘⇧Z`).
-- 👁️ Vista previa en vivo: `marked` + **Mermaid 12 offline** con los motores
+- Modos de vista **source · split · rendered** y **modo zen** que oculta las
+  barras (atajos `⌘1`/`⌘2`/`⌘3`, `⌘⇧Z`, y `Esc` para salir del zen).
+- Vista previa en vivo: `marked` + **Mermaid 12 offline** con los motores
   ELK, tidy-tree y ZenUML (CDN sólo de respaldo).
-- 💾 Abrir/guardar `.md` nativo, **guardado atómico** y aviso ante cambios
+- Abrir/guardar `.md` nativo, **guardado atómico** y aviso ante cambios
   externos (no pisa en silencio lo que tocó otra app).
-- 🔗 Asociación de tipo `.md` / `text/markdown`: el sistema (y Vera) abren Luca
+- Asociación de tipo `.md` / `text/markdown`: el sistema (y Vera) abren Luca
   por "Abrir con…".
-- 🌗 Claro/oscuro siguiendo al sistema.
-- 🖥️ **Multiplataforma** sobre [Tauri 2](https://tauri.app): macOS, Windows,
+- Tipografía y tokens de color de **Vera** (IBM Plex), con claro/oscuro.
+- **Multiplataforma** sobre [Tauri 2](https://tauri.app): macOS, Windows,
   Linux y —vía Tauri 2— móvil, desde una sola base de código.
 
 ## Capturas
