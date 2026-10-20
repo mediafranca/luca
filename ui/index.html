@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>luca</title>
 <style>
-  :root { color-scheme: light dark; --gap: 1px; --rule: rgba(127,127,127,.25); }
+  :root { color-scheme: light dark; --rule: rgba(127,127,127,.25); }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body { display: grid; grid-template-columns: 1fr 1fr; background: var(--rule);
@@ -17,6 +17,8 @@
   pre, code { font-family: ui-monospace, Menlo, monospace; }
   #preview pre:not(.mermaid) { background: rgba(127,127,127,.12); padding: 12px; border-radius: 8px; overflow-x: auto; }
   pre.mermaid { background: transparent; text-align: center; }
+  pre.mermaid-error { background: rgba(220,60,60,.12); color: #c0392b; padding: 10px 12px;
+                      border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
   img { max-width: 100%; }
   blockquote { border-left: 3px solid var(--rule); margin: 0; padding-left: 1em; opacity: .85; }
   table { border-collapse: collapse; } td, th { border: 1px solid var(--rule); padding: 4px 8px; }
@@ -26,10 +28,6 @@
 <body>
   <textarea id="editor" spellcheck="false"></textarea>
   <div id="preview"></div>
-  <!-- ponytail: marked + mermaid from CDN — needs network. Vendor the two .js
-       files into ui/ when offline rendering matters. -->
-  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

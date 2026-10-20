@@ -1,0 +1,17 @@
+{
+  "name": "luca",
+  "version": "0.1.0",
+  "description": "Editor Markdown mínimo y rápido, con Mermaid offline.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs"
+  },
+  "dependencies": {
+    "@mermaid-js/layout-elk": "^1.0.1",
+    "@mermaid-js/layout-tidy-tree": "^1.0.1",
+    "@mermaid-js/mermaid-zenuml": "^1.0.1",
+    "marked": "^12.0.2",
+    "mermaid": "^12.2.0"
+  }
+}
