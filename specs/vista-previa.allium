@@ -56,6 +56,15 @@ surface VistaPrevia {
         -- documento guarda siempre el texto fuente; luca no exporta ni
         -- sustituye el diagrama por SVG.
 
+    @guarantee MedidaParaTodo
+        -- La medida (ancho de columna) rige todo el contenido renderizado:
+        -- encabezados, tablas, diagramas Mermaid, código e imágenes.
+
+    @guarantee SigueAlCursor
+        -- En la vista dividida, la vista previa se desplaza al bloque donde
+        -- está el cursor del editor; la proporción entre ambos paneles se
+        -- ajusta arrastrando el divisor.
+
     @guarantee RenderOffline
         -- marked y mermaid (con los motores ELK, tidy-tree y ZenUML) se cargan
         -- desde recursos locales; el CDN es sólo respaldo.

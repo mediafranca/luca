@@ -4,7 +4,7 @@
 //
 // Los colores y tipografías salen de los tokens de Vera (variables CSS en
 // :root), así que el claro/oscuro cambia solo con el sistema.
-import { EditorView, basicSetup } from "codemirror";
+import { EditorView, basicSetup, minimalSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -41,21 +41,45 @@ const highlight = HighlightStyle.define([
   { tag: [t.list, t.processingInstruction], color: "var(--accent)" },
 ]);
 
-const themeFor = (dark) => [editorTheme(dark), syntaxHighlighting(highlight)];
+// Editor de bloque (vista renderizada): sin numeración ni fondo propio; la
+// tipografía la hereda del bloque renderizado que sustituye (CSS .block-edit).
+const blockTheme = EditorView.theme({
+  "&": { backgroundColor: "transparent", color: "inherit", fontSize: "inherit", lineHeight: "inherit" },
+  ".cm-scroller": { fontFamily: "inherit", lineHeight: "inherit", overflow: "visible" },
+  ".cm-content": { padding: "0", caretColor: "var(--accent)", lineHeight: "inherit" },
+  ".cm-line": { padding: "0" },
+  "&.cm-focused": { outline: "none" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
+  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+    backgroundColor: "color-mix(in srgb, var(--accent) 28%, transparent)" },
+});
 
-export function createMarkdownEditor({ parent, doc, dark, onChange }) {
+// Resaltado del bloque: sin colores propios (hereda los de la vista previa);
+// sólo énfasis, enlaces en acento y código en mono, como en el texto renderizado.
+const blockHighlight = HighlightStyle.define([
+  { tag: t.strong, fontWeight: "700" },
+  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: [t.link, t.url], color: "var(--accent)" },
+  { tag: [t.monospace, t.literal], fontFamily: "var(--font-mono)", fontSize: ".9em" },
+]);
+
+const themeFor = (dark, block) =>
+  block ? [blockTheme, syntaxHighlighting(blockHighlight)] : [editorTheme(dark), syntaxHighlighting(highlight)];
+
+export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, block = false }) {
   const themeComp = new Compartment();
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc,
       extensions: [
-        basicSetup,
+        block ? minimalSetup : basicSetup,
         markdown({ base: markdownLanguage }),
         EditorView.lineWrapping,
-        themeComp.of(themeFor(dark)),
+        themeComp.of(themeFor(dark, block)),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange(u.state.doc.toString());
+          if (u.selectionSet || u.docChanged) onCursor?.();
         }),
       ],
     }),
@@ -70,7 +94,8 @@ export function createMarkdownEditor({ parent, doc, dark, onChange }) {
     getDoc: () => view.state.doc.toString(),
     setDoc: (text) =>
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
-    setDark: (d) => view.dispatch({ effects: themeComp.reconfigure(themeFor(d)) }),
+    setDark: (d) => view.dispatch({ effects: themeComp.reconfigure(themeFor(d, block)) }),
+    destroy: () => view.destroy(),
     remeasure: () => view.requestMeasure(),
     focus: () => view.focus(),
     getView: () => view,
@@ -92,6 +117,8 @@ export function createMarkdownEditor({ parent, doc, dark, onChange }) {
       });
       view.focus();
     },
+    // Reemplazo sin tocar foco ni selección (lo usa la edición por bloques).
+    setRange: (text, from, to) => view.dispatch({ changes: { from, to, insert: text } }),
     replaceRange: (text, from, to) => {
       view.dispatch({
         changes: { from, to, insert: text },
@@ -108,6 +135,7 @@ export function createMarkdownEditor({ parent, doc, dark, onChange }) {
       view.focus();
     },
     getCursor: () => view.state.selection.main.head,
+    getCursorLine: () => view.state.doc.lineAt(view.state.selection.main.head).number,
     getLineAt: (pos) => view.state.doc.lineAt(pos),
   };
 }

@@ -74,24 +74,27 @@
   .topbar-btn .icon { width:14px; height:14px; }
 
   /* ---- Área de trabajo ---- */
-  #workspace { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule); min-height:0; }
+  /* --split: ancho de la columna de código en split (arrastrando el divisor). */
+  #workspace { display:grid; grid-template-columns:minmax(12em, var(--split, 50%)) 1px minmax(12em, 1fr); min-height:0; }
+  #divider { position:relative; background:var(--rule); cursor:col-resize; z-index:5; }
+  #divider::after { content:""; position:absolute; top:0; bottom:0; left:-4px; right:-4px; }
   #editors { position:relative; min-height:0; background:var(--code-bg); overflow:hidden; }
   #previews { position:relative; min-height:0; background:var(--preview-bg); overflow:hidden; }
   .doc-editor { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; background:var(--code-bg); color:var(--code-text); }
   .doc-editor[hidden], .doc-preview[hidden] { display:none; }
-  .doc-editor-cm { flex:1 1 0; min-height:0; height:calc(100% - 34px); position:relative; background:var(--code-bg); color:var(--code-text); }
+  .doc-editor-cm { flex:1 1 0; min-height:0; height:100%; position:relative; background:var(--code-bg); color:var(--code-text); }
   .cm-editor { height:100%; background:var(--code-bg); color:var(--code-text); }
   .cm-editor.cm-focused { outline:none; }
   .cm-scroller { background:var(--code-bg); color:var(--code-text); }
   .cm-gutters { background:var(--code-bg) !important; color:var(--text-dim) !important; }
   .cm-content { color:var(--code-text); }
 
-  /* ---- Barra de herramientas del editor (reciclada de Vera) ---- */
+  /* ---- Barra de herramientas (reciclada de Vera): cápsula en la barra superior,
+          junto a los modos; opera sobre el documento activo en cualquier vista. ---- */
   .editor-toolbar {
-    flex:0 0 auto; display:flex; align-items:center; gap:2px; padding:2px 6px;
-    background:var(--bg-raised); border-bottom:1px solid var(--rule);
+    flex:0 1 auto; min-width:0; display:flex; align-items:center; gap:2px; padding:1px 4px;
+    border:1px solid var(--rule); border-radius:7px;
     overflow-x:auto; scrollbar-width:none; font-family:var(--font-ui, var(--font-body));
-    z-index:10; min-height:32px; box-sizing:border-box;
   }
   .editor-toolbar::-webkit-scrollbar { display:none; }
   .toolbar-group { display:flex; align-items:center; gap:1px; flex-shrink:0; }
@@ -121,36 +124,40 @@
   }
   .toolbar-heading-option:hover { background:var(--bg); color:var(--accent); }
 
-  body[data-mode="source"]   #previews { display:none; }
+  body[data-mode="source"]   #previews, body[data-mode="source"]   #divider { display:none; }
   body[data-mode="source"]   #workspace { grid-template-columns:1fr; }
-  body[data-mode="rendered"] #editors  { display:none; }
+  body[data-mode="rendered"] #editors,  body[data-mode="rendered"] #divider { display:none; }
   body[data-mode="rendered"] #workspace { grid-template-columns:1fr; }
 
-  /* ---- Vista previa: prosa con medida controlada ---- */
-  .doc-preview { height:100%; overflow:auto; padding:2.4rem clamp(1.2rem, 5vw, 3rem); background:var(--preview-bg);
+  /* ---- Vista previa: prosa con medida controlada ----
+     La medida (--content-width) es una columna centrada que se obtiene con el
+     padding lateral del contenedor, así vale para TODO el contenido: títulos,
+     tablas, diagramas, código e imágenes, sin reglas por elemento. */
+  .doc-preview { height:100%; overflow:auto; background:var(--preview-bg);
+    padding:2.4rem max(clamp(1.2rem, 5vw, 3rem), calc((100% - var(--content-width)) / 2));
     color:var(--preview-text); font-family:var(--font-read); }
-  .doc-preview > * { max-width:var(--content-width); margin-left:auto; margin-right:auto; }
   .doc-preview h1, .doc-preview h2, .doc-preview h3, .doc-preview h4, .doc-preview h5, .doc-preview h6 {
-    line-height:1.18; font-weight:600; letter-spacing:-.01em; margin:1.6em auto .5em; color:var(--preview-text);
-    max-width:var(--content-width); }
-  .doc-preview p, .doc-preview ul, .doc-preview ol, .doc-preview blockquote { margin:0 auto .9em; color:var(--preview-text); max-width:var(--content-width); }
+    line-height:1.18; font-weight:600; letter-spacing:-.01em; margin:1.6em 0 .5em; color:var(--preview-text); }
+  .doc-preview p, .doc-preview ul, .doc-preview ol, .doc-preview blockquote { margin:0 0 .9em; color:var(--preview-text); }
   .doc-preview a { color:var(--accent); text-underline-offset:2px; }
   .doc-preview code { font-family:var(--font-mono); font-size:.9em; }
   .doc-preview pre:not(.mermaid) { font-family:var(--font-mono); background:var(--code-bg, var(--bg-raised));
     color:var(--code-text, var(--text)); padding:14px 16px; border-radius:8px; overflow-x:auto; }
-  pre.mermaid { background:transparent; text-align:center; max-width:var(--content-width); margin:1.5em auto; }
-  pre.mermaid svg { max-width:100%; height:auto; display:block; margin:0 auto; }
+  pre.mermaid { background:transparent; text-align:center; margin:1.5em 0; }
+  /* Mermaid fija max-width en px inline; la columna manda. */
+  pre.mermaid svg { max-width:100% !important; height:auto; display:block; margin:0 auto; }
   pre.mermaid-error { background:var(--bg-raised); color:var(--accent);
     padding:10px 14px; border-radius:8px; white-space:pre-wrap; font-size:.85em; }
   .doc-preview img { max-width:100%; }
   .doc-preview blockquote { border-left:3px solid var(--rule); padding-left:1em; color:var(--text-dim); }
   .doc-preview table { border-collapse:collapse; margin:0 auto; max-width:100%; }
-  .doc-preview td, .doc-preview th { border:1px solid var(--rule); padding:5px 9px; }
-  .doc-preview hr { border:0; height:1px; background:var(--preview-text); opacity:.35;
-    margin:2.2em auto; max-width:var(--content-width); }
+  .doc-preview .preview-table-wrapper { overflow-x:auto; }
+  /* overflow-wrap deja que las palabras largas se partan: así la tabla cabe en la columna. */
+  .doc-preview td, .doc-preview th { border:1px solid var(--rule); padding:5px 9px; overflow-wrap:anywhere; }
+  .doc-preview hr { border:0; height:1px; background:var(--preview-text); opacity:.35; margin:2.2em 0; }
 
   /* Contenedor y botón de editar tabla en vista previa */
-  .preview-table-wrapper { position:relative; margin:1.2em auto; max-width:var(--content-width); }
+  .preview-table-wrapper { position:relative; margin:1.2em 0; }
   .preview-table-wrapper:hover .preview-edit-table { opacity:1; pointer-events:auto; }
   .preview-edit-table {
     position:absolute; top:-12px; right:6px; opacity:0; pointer-events:none;
@@ -162,19 +169,39 @@
   .preview-edit-table:hover { background:var(--bg); color:var(--accent); }
   .preview-edit-table .icon { width:12px; height:12px; }
 
+  /* ---- Edición por bloques (modo renderizado): mismo lugar, misma tipografía y
+          mismos colores que el texto previsualizado; sólo un filete de acento a
+          la izquierda señala el bloque abierto. ---- */
+  body[data-mode="rendered"] .doc-preview [data-from] { cursor:text; }
+  .block-edit { border-left:2px solid var(--accent); padding-left:.5em; margin-left:calc(-.5em - 2px); }
+  /* Las reglas globales .cm-* pintan con los colores del editor de código; aquí mandan los del texto. */
+  .block-edit .cm-editor, .block-edit .cm-scroller, .block-edit .cm-content { background:transparent; color:inherit; }
+  .block-edit.p, .block-edit.ul, .block-edit.ol, .block-edit.blockquote { margin-bottom:.9em; }
+  .block-edit.ul, .block-edit.ol { padding-left:1.6em; }
+  .block-edit.blockquote { border-left:3px solid var(--accent); padding-left:1em; margin-left:0; color:var(--text-dim); }
+  .block-edit.h1, .block-edit.h2, .block-edit.h3, .block-edit.h4, .block-edit.h5, .block-edit.h6 {
+    font-weight:600; line-height:1.18; letter-spacing:-.01em; margin-top:1.6em; margin-bottom:.5em; }
+  .block-edit.h1 { font-size:2em; } .block-edit.h2 { font-size:1.5em; } .block-edit.h3 { font-size:1.17em; }
+  .block-edit.h4 { font-size:1em; } .block-edit.h5 { font-size:.83em; } .block-edit.h6 { font-size:.67em; }
+  .block-edit.pre { font-family:var(--font-mono); background:var(--code-bg, var(--bg-raised));
+    color:var(--code-text, var(--text)); padding:14px 16px; border-radius:0 8px 8px 0; margin:1.5em 0; }
+  .block-edit.hr { font-family:var(--font-mono); color:var(--text-dim); margin-top:2.2em; margin-bottom:2.2em; }
+  .block-edit.table { margin-top:1.2em; margin-bottom:1.2em; font-family:var(--font-mono); font-size:.9em; }
+
   /* ---- Modo zen ---- */
   /* La barra se retrae; reaparece al acercar el cursor al borde superior. */
+  /* La barra sale del flujo (fixed): el área de trabajo ocupa la única fila. */
+  body[data-zen="on"] { grid-template-rows:1fr; }
   body[data-zen="on"] #topbar { position:fixed; top:0; left:0; right:0; z-index:40;
     transform:translateY(-100%); transition:transform .18s ease; }
   body[data-zen="on"] #topbar:hover { transform:none; }
   body[data-zen="on"] #topbar::after { content:""; position:absolute; left:0; right:0; top:100%; height:18px; }
-  /* En zen, se quita la barra de herramientas y la medida se centra en el editor (foco de escritura). */
-  body[data-zen="on"] .editor-toolbar { display:none !important; }
-  body[data-zen="on"] #editors { display:flex; justify-content:center; background:var(--code-bg); }
+  /* En zen, la medida se centra también en el editor (foco de escritura). */
+  body[data-zen="on"]:not([data-mode="rendered"]) #editors { display:flex; justify-content:center; background:var(--code-bg); }
   body[data-zen="on"] .doc-editor { width:100%; max-width:var(--content-width); margin:0 auto; height:100%; }
   body[data-zen="on"] .doc-editor-cm { height:100%; flex:1 1 auto; }
 
-  @media (max-width:640px) { #workspace { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
+  @media (max-width:640px) { #workspace { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } #divider { display:none; } }
   @media (prefers-reduced-motion: reduce) { body[data-zen="on"] #topbar { transition:none; } }
 
   /* ---- Editor visual de tablas Markdown ---- */
@@ -324,7 +351,12 @@
     #workspace { display:block; }
     #previews { display:block !important; overflow:visible; }
     .doc-preview[hidden] { display:none !important; }
-    .doc-preview:not([hidden]) { display:block !important; height:auto; overflow:visible; padding:0; }
+    .doc-preview:not([hidden]) { display:block !important; height:auto; overflow:visible; padding:0;
+      max-width:var(--content-width); margin:0 auto; }
+    /* Tablas, diagramas, código e imágenes no se parten en el salto de página;
+       un título no queda huérfano al pie. */
+    .preview-table-wrapper, table, pre, img, .block-edit { break-inside:avoid; page-break-inside:avoid; }
+    h1, h2, h3, h4 { break-after:avoid; page-break-after:avoid; }
   }
 </style>
 </head>
@@ -348,6 +380,7 @@
   </div>
   <div id="workspace">
     <div id="editors"></div>
+    <div id="divider" role="separator" aria-orientation="vertical" title="Arrastra para cambiar la proporción · doble clic: 50 %"></div>
     <div id="previews"></div>
   </div>
   <div id="prefs" hidden>

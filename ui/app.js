@@ -5,6 +5,7 @@
 import { createMarkdownEditor } from "./vendor/codemirror/editor.js";
 import { createEditorToolbar, editDocumentTableAtIndex } from "./toolbar.js";
 import { icon } from "./icons.js";
+import { beginBlockEdit, exitBlockEdit } from "./block-edit.js";
 
 const LOCAL = "./vendor";
 const CDN = "https://cdn.jsdelivr.net/npm";
@@ -97,6 +98,10 @@ let active = null;   // documento activo
 let seq = 0;         // ids de mermaid, únicos entre TODOS los documentos
 let nextId = 1;
 
+// Una sola barra de herramientas, en la barra superior; opera sobre el
+// documento activo (el getter resuelve `doc.ed` en cada clic).
+document.getElementById("modes").after(createEditorToolbar({ get ed() { return active?.block?.ed ?? active?.ed; } }));
+
 const dark = () => isCurrentDark();
 const baseName = (p) => (p ? p.split(/[\\/]/).pop() : "sin título");
 
@@ -134,8 +139,39 @@ function toAssetUrl(filePath) {
   return filePath;
 }
 
+// Markdown → DOM por bloques: cada elemento de nivel superior lleva data-line
+// con la línea del texto donde empieza su bloque (para sincronizar el scroll y,
+// más adelante, para la edición por bloques).
+function renderBlocks(src) {
+  const text = src.replace(/\r\n|\r/g, "\n");
+  const nl = (t) => (t.match(/\n/g) || []).length;
+  const out = document.createElement("template");
+  let pos = 0, line = 1;
+  for (const tok of marked.lexer(text)) {
+    // ponytail: marked omite los tokens `def`; indexOf recupera el hueco.
+    let at = text.indexOf(tok.raw, pos);
+    if (at < 0) at = pos;
+    line += nl(text.slice(pos, at));
+    if (tok.type !== "space") {
+      const t = document.createElement("template");
+      t.innerHTML = marked.parser([tok]);
+      const src = tok.raw.replace(/\n+$/, "");   // sin las líneas en blanco que separan bloques
+      for (const el of t.content.children) {
+        el.dataset.line = line;
+        el.dataset.from = at;
+        el.dataset.to = at + src.length;
+      }
+      out.content.append(t.content);
+    }
+    line += nl(tok.raw);
+    pos = at + tok.raw.length;
+  }
+  return out.content;
+}
+
 async function renderDoc(doc) {
-  doc.previewEl.innerHTML = marked.parse(doc.ed.getDoc());
+  if (doc.block) return;   // hay un bloque en edición: se renderiza al salir
+  doc.previewEl.replaceChildren(renderBlocks(doc.ed.getDoc()));
 
   // Resolver rutas relativas de imágenes y medios locales respecto al archivo abierto
   const docDir = getDocDir(doc);
@@ -182,6 +218,7 @@ async function renderDoc(doc) {
     });
     wrapper.append(editBtn);
   });
+  syncPreview(doc);
 }
 
 // ponytail: 150ms debounce por documento. Un render viejo que siga corriendo
@@ -212,6 +249,7 @@ function renderTabs() {
 }
 
 function activate(doc) {
+  if (active && active !== doc) exitBlockEdit(active);
   active = doc;
   for (const d of docs) { d.editorEl.hidden = d !== doc; d.previewEl.hidden = d !== doc; }
   renderTabs();
@@ -240,6 +278,7 @@ function makeDoc(initialDoc, path) {
     previewEl,
     ed: null,
     t: null,
+    block: null,   // bloque en edición en la vista renderizada (block-edit.js)
   };
 
   doc.ed = createMarkdownEditor({
@@ -247,10 +286,9 @@ function makeDoc(initialDoc, path) {
     doc: initialDoc,
     dark: isCurrentDark(),
     onChange: () => onEdit(doc),
+    onCursor: () => syncPreview(doc),
   });
-
-  const toolbar = createEditorToolbar(doc, (idx) => editDocumentTableAtIndex(doc, idx));
-  editorEl.append(toolbar, cmMount);
+  editorEl.append(cmMount);
 
   docs.push(doc);
   activate(doc);
@@ -296,6 +334,7 @@ const newDoc = () => makeDoc("", null);
 function closeDoc(doc) {
   if (doc.dirty && !confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`)) return;
   const i = docs.indexOf(doc);
+  exitBlockEdit(doc, false);
   doc.editorEl.remove();
   doc.previewEl.remove();
   docs.splice(i, 1);
@@ -344,13 +383,69 @@ if (TAURI) {
   });
 }
 
+// ---------- Vista dividida: proporción arrastrable y scroll a la par ----------
+const workspaceEl = document.getElementById("workspace");
+const dividerEl = document.getElementById("divider");
+try { const s = localStorage.getItem("luca.split"); if (s) workspaceEl.style.setProperty("--split", s); } catch {}
+dividerEl.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  dividerEl.setPointerCapture(e.pointerId);
+  const rect = workspaceEl.getBoundingClientRect();
+  const move = (ev) => {
+    const pct = Math.min(80, Math.max(20, ((ev.clientX - rect.left) / rect.width) * 100));
+    workspaceEl.style.setProperty("--split", `${pct.toFixed(1)}%`);
+  };
+  const up = () => {
+    dividerEl.removeEventListener("pointermove", move);
+    dividerEl.removeEventListener("pointerup", up);
+    try { localStorage.setItem("luca.split", workspaceEl.style.getPropertyValue("--split")); } catch {}
+    active?.ed.remeasure();
+  };
+  dividerEl.addEventListener("pointermove", move);
+  dividerEl.addEventListener("pointerup", up);
+});
+dividerEl.addEventListener("dblclick", () => {
+  workspaceEl.style.removeProperty("--split");
+  try { localStorage.removeItem("luca.split"); } catch {}
+});
+
+// Lleva la vista previa al bloque donde está el cursor: sólo en split y para
+// el documento activo. Los bloques llevan data-line (ver renderBlocks).
+function syncPreview(doc) {
+  if (doc !== active || document.body.dataset.mode !== "split") return;
+  const line = doc.ed.getCursorLine();
+  let target = null;
+  for (const el of doc.previewEl.querySelectorAll("[data-line]")) {
+    if (Number(el.dataset.line) > line) break;
+    target = el;
+  }
+  if (!target) return;
+  const pv = doc.previewEl;
+  const top = pv.scrollTop + target.getBoundingClientRect().top - pv.getBoundingClientRect().top - 24;
+  pv.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+}
+
 // ---------- Modos de vista (source · split · rendered), tema y zen ----------
 function applyMode(m) {
   document.body.dataset.mode = m;
   for (const b of document.querySelectorAll("#modebar button[data-mode]"))
     b.classList.toggle("active", b.dataset.mode === m);
   try { localStorage.setItem("luca.mode", m); } catch {}
+  if (active && m !== "rendered") exitBlockEdit(active);
+  if (active) syncPreview(active);
 }
+
+// Vista renderizada editable: pulsar un bloque lo abre con su Markdown in situ;
+// pulsar fuera de un bloque cierra el que esté abierto.
+previewsEl.addEventListener("click", (e) => {
+  const doc = active;
+  if (!doc || document.body.dataset.mode !== "rendered") return;
+  if (e.target.closest(".block-edit, .preview-edit-table")) return;
+  const el = e.target.closest("[data-from]");
+  if (!el) { exitBlockEdit(doc); return; }
+  e.preventDefault();   // un enlace no navega: se edita
+  beginBlockEdit(doc, el, { x: e.clientX, y: e.clientY }, { dark: isCurrentDark(), onExit: () => renderDoc(doc) });
+});
 
 async function toggleZen(force) {
   const on = force ?? document.body.dataset.zen !== "on";

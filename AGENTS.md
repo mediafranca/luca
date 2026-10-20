@@ -38,6 +38,7 @@ archivos no indexados, o si el grafo no devuelve información suficiente.
 | --- | --- |
 | `ui/app.js` | Documentos y pestañas, apertura/guardado, preview Markdown/Mermaid, modos, preferencias e IPC con Tauri. |
 | `ui/editor.src.js` | `createMarkdownEditor`, API del editor CodeMirror 6, temas y medición tipográfica. Se empaqueta; no se importa directamente en el navegador. |
+| `ui/block-edit.js` | Edición por bloques en la vista renderizada: abre un bloque con su Markdown in situ, sincroniza su rango con el documento y lo cierra. |
 | `ui/index.html` | DOM, estilos, tokens de Vera, fuentes locales, modos source/split/rendered, zen e impresión. |
 | `src-tauri/src/main.rs` | I/O de archivos, mtime, menú nativo y apertura desde el sistema. |
 | `src-tauri/tauri.conf.json` | Empaquetado, CSP, ventana, asociación `.md`/`.markdown` y hooks de desarrollo. |
