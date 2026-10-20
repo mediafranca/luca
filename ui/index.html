@@ -112,14 +112,20 @@
   #prefs { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; }
   #prefs[hidden] { display:none; }
   .prefs-panel { background:var(--bg-raised); border:1px solid var(--rule); border-radius:12px;
-    padding:22px 24px; min-width:300px; box-shadow:0 12px 40px rgba(0,0,0,.18); }
-  .prefs-panel h2 { margin:0 0 16px; font-size:1.05rem; font-weight:600; }
-  .prefs-panel label { display:block; font-size:13px; color:var(--text-dim); }
-  .prefs-panel select { margin-top:6px; width:100%; font:inherit; padding:6px 8px;
-    border:1px solid var(--rule); border-radius:7px; background:var(--bg); color:var(--text); }
-  .prefs-note { font-size:12px; color:var(--text-dim); margin:14px 0 18px; }
-  #prefsClose { font:inherit; padding:6px 16px; border:1px solid var(--rule); border-radius:7px;
-    background:var(--bg); color:var(--text); cursor:pointer; }
+    padding:20px 22px; width:min(420px, 92vw); max-height:86vh; overflow:auto;
+    box-shadow:0 12px 40px rgba(0,0,0,.18); font-family:var(--font-body); }
+  .prefs-panel h2 { margin:0 0 4px; font-size:1.05rem; font-weight:600; }
+  .prefs-group { margin-top:16px; font-size:11px; letter-spacing:.04em; color:var(--text-dim); }
+  .prefs-row { display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:6px 0; font-size:13px; }
+  .prefs-row > span { color:var(--text); }
+  .prefs-row select, .prefs-row input[type=text] { flex:0 0 55%; font:inherit; font-size:12.5px;
+    padding:5px 7px; border:1px solid var(--rule); border-radius:6px; background:var(--bg); color:var(--text); }
+  .prefs-row input[type=color] { width:34px; height:24px; padding:0; border:1px solid var(--rule);
+    border-radius:5px; background:var(--bg); cursor:pointer; }
+  .prefs-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+  .prefs-actions button { font:inherit; font-size:13px; padding:6px 15px; border:1px solid var(--rule);
+    border-radius:7px; background:var(--bg); color:var(--text); cursor:pointer; }
 
   /* ---- Impresión / Exportar PDF: sólo la vista previa del documento activo ---- */
   @media print {
@@ -151,17 +157,10 @@
   </div>
   <div id="prefs" hidden>
     <div class="prefs-panel">
-      <h2>Preferencias</h2>
-      <label>Tipografía del texto renderizado
-        <select id="readFont">
-          <option value="'Roboto Serif', Georgia, serif">Roboto Serif</option>
-          <option value="'IBM Plex Sans', system-ui, sans-serif">IBM Plex Sans</option>
-          <option value="Georgia, 'Times New Roman', serif">Serif del sistema</option>
-          <option value="system-ui, sans-serif">Sans del sistema</option>
-        </select>
-      </label>
-      <p class="prefs-note">El código siempre va en monoespaciada (IBM Plex Mono).</p>
-      <label>Tema de Mermaid
+      <h2>Preferencias · Tokens</h2>
+      <div id="tokenForm"></div>
+      <div class="prefs-row">
+        <span>Tema de Mermaid</span>
         <select id="mermaidTheme">
           <option value="vera">Vera (tokenizado)</option>
           <option value="neutral">Neutral</option>
@@ -169,9 +168,11 @@
           <option value="forest">Forest</option>
           <option value="dark">Dark</option>
         </select>
-      </label>
-      <p class="prefs-note">El editor de tokens de diseño llegará aquí.</p>
-      <button id="prefsClose">Cerrar</button>
+      </div>
+      <div class="prefs-actions">
+        <button id="prefsReset">Restablecer</button>
+        <button id="prefsClose">Cerrar</button>
+      </div>
     </div>
   </div>
   <script type="module" src="app.js"></script>

@@ -10,21 +10,21 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 
-const LH = "1.65";
+// Interlínea FIJA en píxeles: cada línea mide lo mismo pase lo que pase con la
+// carga de la fuente, así numeración y contenido no se desalinean.
+const LH = "22px";
 function editorTheme(dark) {
   return EditorView.theme(
     {
-      // Tamaño y familia en la raíz del editor: contenido y numeración heredan
-      // lo mismo, así no se desalinean.
-      "&": { color: "var(--text)", backgroundColor: "var(--bg)",
-             fontFamily: "var(--font-mono)", fontSize: "13.5px" },
-      ".cm-scroller": { lineHeight: LH },
+      "&": { color: "var(--text)", backgroundColor: "var(--bg)", fontSize: "13.5px", lineHeight: LH },
+      // CodeMirror fija font-family en .cm-scroller; hay que ponerla AQUÍ o la pisa.
+      ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: LH },
       ".cm-content": { caretColor: "var(--accent)", padding: "20px 20px", lineHeight: LH },
-      ".cm-line": { padding: "0 2px" },
-      ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
+      ".cm-line": { lineHeight: LH, padding: "0 2px" },
       ".cm-gutters": { backgroundColor: "var(--bg)", color: "var(--text-dim)", border: "none",
-                       fontSize: "11.5px" },
-      ".cm-lineNumbers .cm-gutterElement": { padding: "0 10px 0 14px" },
+                       fontSize: "12px", lineHeight: LH },
+      ".cm-lineNumbers .cm-gutterElement": { lineHeight: LH, padding: "0 10px 0 16px" },
+      ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
       ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--text)" },
     },
     { dark },
@@ -71,6 +71,7 @@ export function createMarkdownEditor({ parent, doc, dark, onChange }) {
     setDoc: (text) =>
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
     setDark: (d) => view.dispatch({ effects: themeComp.reconfigure(themeFor(d)) }),
+    remeasure: () => view.requestMeasure(),
     focus: () => view.focus(),
   };
 }

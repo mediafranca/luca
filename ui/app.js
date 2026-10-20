@@ -269,35 +269,106 @@ document.getElementById("zen").addEventListener("click", () => toggleZen());
 // el diálogo de impresión de macOS ofrece «Guardar como PDF».
 function exportPdf() { window.print(); }
 
-// Preferencias: tipografía de lectura (separada del código, que es siempre
-// mono) y tema de Mermaid. El editor de tokens llegará aquí.
-const DEFAULT_READ_FONT = "'Roboto Serif', Georgia, serif";
-const readFontPref = () => { try { return localStorage.getItem("luca.readFont") || DEFAULT_READ_FONT; } catch { return DEFAULT_READ_FONT; } };
-const applyReadFont = (v) => document.documentElement.style.setProperty("--font-read", v);
+// ---------- Editor de tokens (Preferencias) ----------
+// Todos los tokens son administrables: se guardan como override en localStorage
+// y se aplican en línea sobre :root. Un override de color pisa ambos esquemas.
+const FONT_STACKS = [
+  ["IBM Plex Mono", "'IBM Plex Mono', ui-monospace, Menlo, monospace"],
+  ["IBM Plex Sans", "'IBM Plex Sans', system-ui, sans-serif"],
+  ["Roboto Serif", "'Roboto Serif', Georgia, serif"],
+  ["Mono del sistema", "ui-monospace, 'SF Mono', Menlo, monospace"],
+  ["Serif del sistema", "Georgia, 'Times New Roman', serif"],
+  ["Sans del sistema", "system-ui, sans-serif"],
+];
+const TOKENS = [
+  { group: "Tipografía" },
+  { name: "--font-mono", label: "Código", kind: "font" },
+  { name: "--font-read", label: "Texto renderizado", kind: "font" },
+  { group: "Medida" },
+  { name: "--text-size", label: "Tamaño de texto", kind: "text" },
+  { name: "--line-height", label: "Interlínea", kind: "text" },
+  { name: "--content-width", label: "Ancho de columna", kind: "text" },
+  { group: "Color" },
+  { name: "--bg", label: "Fondo", kind: "color" },
+  { name: "--bg-raised", label: "Fondo elevado", kind: "color" },
+  { name: "--text", label: "Texto", kind: "color" },
+  { name: "--text-dim", label: "Texto tenue", kind: "color" },
+  { name: "--rule", label: "Líneas", kind: "color" },
+  { name: "--accent", label: "Acento", kind: "color" },
+];
+
+const loadOverrides = () => { try { return JSON.parse(localStorage.getItem("luca.tokens") || "{}"); } catch { return {}; } };
+function saveOverride(name, val) { const o = loadOverrides(); o[name] = val; try { localStorage.setItem("luca.tokens", JSON.stringify(o)); } catch {} }
+function applyOverrides() { for (const [n, v] of Object.entries(loadOverrides())) document.documentElement.style.setProperty(n, v); }
+const tokenValue = (name) => (loadOverrides()[name] ?? cssVar(name)).trim();
 
 const prefsEl = document.getElementById("prefs");
 const mermaidSel = document.getElementById("mermaidTheme");
-const readSel = document.getElementById("readFont");
-function openPrefs() {
-  if (mermaidSel) mermaidSel.value = mermaidTheme();
-  if (readSel) readSel.value = readFontPref();
-  if (prefsEl) prefsEl.hidden = false;
+const tokenForm = document.getElementById("tokenForm");
+
+function onTokenChange(name, val, kind) {
+  document.documentElement.style.setProperty(name, val);
+  saveOverride(name, val);
+  for (const d of docs) d.ed.remeasure?.();           // fuente/tamaño nuevos: re-medir
+  if (kind !== "color") for (const d of docs) renderDoc(d);
 }
+
+function buildTokenForm() {
+  if (!tokenForm) return;
+  tokenForm.replaceChildren();
+  for (const t of TOKENS) {
+    if (t.group) {
+      const g = document.createElement("div"); g.className = "prefs-group"; g.textContent = t.group;
+      tokenForm.append(g); continue;
+    }
+    const row = document.createElement("div"); row.className = "prefs-row";
+    const span = document.createElement("span"); span.textContent = t.label; row.append(span);
+    let input;
+    if (t.kind === "font") {
+      input = document.createElement("select");
+      for (const [label, stack] of FONT_STACKS) {
+        const o = document.createElement("option"); o.value = stack; o.textContent = label; input.append(o);
+      }
+      input.value = tokenValue(t.name);
+      input.addEventListener("change", () => onTokenChange(t.name, input.value, "font"));
+    } else if (t.kind === "color") {
+      input = document.createElement("input"); input.type = "color";
+      const v = tokenValue(t.name);
+      input.value = /^#[0-9a-f]{6}$/i.test(v) ? v : "#000000";
+      input.addEventListener("input", () => onTokenChange(t.name, input.value, "color"));
+    } else {
+      input = document.createElement("input"); input.type = "text";
+      input.value = tokenValue(t.name);
+      input.addEventListener("change", () => onTokenChange(t.name, input.value, "text"));
+    }
+    row.append(input); tokenForm.append(row);
+  }
+}
+
+function openPrefs() { if (mermaidSel) mermaidSel.value = mermaidTheme(); buildTokenForm(); if (prefsEl) prefsEl.hidden = false; }
 function closePrefs() { if (prefsEl) prefsEl.hidden = true; }
+function resetTokens() {
+  try { localStorage.removeItem("luca.tokens"); } catch {}
+  for (const t of TOKENS) if (t.name) document.documentElement.style.removeProperty(t.name);
+  buildTokenForm();
+  for (const d of docs) { d.ed.remeasure?.(); renderDoc(d); }
+}
+
 if (prefsEl) {
   prefsEl.addEventListener("click", (e) => { if (e.target === prefsEl) closePrefs(); });
   document.getElementById("prefsClose").addEventListener("click", closePrefs);
+  document.getElementById("prefsReset").addEventListener("click", resetTokens);
   mermaidSel.addEventListener("change", () => {
     try { localStorage.setItem("luca.mermaidTheme", mermaidSel.value); } catch {}
     initMermaid();
     for (const d of docs) renderDoc(d);
   });
-  readSel.addEventListener("change", () => {
-    try { localStorage.setItem("luca.readFont", readSel.value); } catch {}
-    applyReadFont(readSel.value);
-  });
 }
-applyReadFont(readFontPref());
+// ⌘, abre Preferencias (convención macOS; también en el navegador).
+addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === ",") { e.preventDefault(); openPrefs(); }
+});
+applyOverrides();
 
 // Esc sale del zen SIEMPRE: en fase de captura, antes de que CodeMirror lo tome.
 addEventListener("keydown", (e) => {
