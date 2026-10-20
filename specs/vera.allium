@@ -54,6 +54,8 @@ surface LanzamientoVera {
 -- Pendientes del ensamble (aún no decididos / no implementados)
 ------------------------------------------------------------
 
+open question "Vista previa del sistema al pulsar Espacio (Quick Look en macOS, Preview Handler en Windows, thumbnailer en Linux). DECIDIDO que se quiere; cada SO es un mecanismo nativo propio. En macOS la vista previa *renderizada* exige una Quick Look Preview Extension (.appex) dentro del .app, que Tauri no genera y que requiere Xcode + firma. La vista previa como *texto* ya depende del tipo de archivo (net.daringfireball.markdown conforma a public.plain-text), no de luca."
+
 open question "CLI 'luca --wait <ruta>' para que Vera conozca la vida de la ventana (no determina la aceptación en Vera)."
 
 open question "Resolver rutas relativas de assets (../assets/img.png) en la vista previa, conservando la referencia literal al guardar. Pendiente de implementar."
