@@ -8,27 +8,49 @@
   :root { color-scheme: light dark; --rule: rgba(127,127,127,.25); }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { display: grid; grid-template-columns: 1fr 1fr; background: var(--rule);
-         font: 15px/1.6 -apple-system, system-ui, sans-serif; }
-  #editor, #preview { height: 100vh; background: Canvas; }
-  #editor { overflow: hidden; }
-  #preview { overflow: auto; padding: 20px 28px; }
+  body { display: grid; grid-template-rows: auto 1fr; height: 100vh;
+         font: 15px/1.6 -apple-system, system-ui, sans-serif; background: Canvas; }
+
+  /* Barra de pestañas */
+  #tabs { display: flex; align-items: stretch; gap: 1px; overflow-x: auto;
+          background: var(--rule); border-bottom: 1px solid var(--rule); }
+  .tab { display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+         background: Canvas; cursor: default; white-space: nowrap; font-size: 13px;
+         max-width: 240px; opacity: .6; }
+  .tab.active { opacity: 1; }
+  .tab .label { overflow: hidden; text-overflow: ellipsis; }
+  .tab .close { border: 0; background: transparent; color: inherit; cursor: pointer;
+                font-size: 15px; line-height: 1; padding: 0 2px; opacity: .5; }
+  .tab .close:hover { opacity: 1; }
+
+  /* Área de trabajo: editor | preview */
+  #workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+               background: var(--rule); min-height: 0; }
+  #editors, #previews { position: relative; min-height: 0; background: Canvas; overflow: hidden; }
+  .doc-editor { height: 100%; }
+  .doc-editor[hidden], .doc-preview[hidden] { display: none; }
+  .doc-preview { height: 100%; overflow: auto; padding: 20px 28px; }
   .cm-editor { height: 100%; }
   .cm-editor.cm-focused { outline: none; }
+
+  /* Preview */
   pre, code { font-family: ui-monospace, Menlo, monospace; }
-  #preview pre:not(.mermaid) { background: rgba(127,127,127,.12); padding: 12px; border-radius: 8px; overflow-x: auto; }
+  .doc-preview pre:not(.mermaid) { background: rgba(127,127,127,.12); padding: 12px; border-radius: 8px; overflow-x: auto; }
   pre.mermaid { background: transparent; text-align: center; }
   pre.mermaid-error { background: rgba(220,60,60,.12); color: #c0392b; padding: 10px 12px;
                       border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
   img { max-width: 100%; }
   blockquote { border-left: 3px solid var(--rule); margin: 0; padding-left: 1em; opacity: .85; }
   table { border-collapse: collapse; } td, th { border: 1px solid var(--rule); padding: 4px 8px; }
-  @media (max-width: 640px) { body { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #editor, #preview { height: 50vh; } }
+  @media (max-width: 640px) { #workspace { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
 </style>
 </head>
 <body>
-  <div id="editor"></div>
-  <div id="preview"></div>
+  <div id="tabs"></div>
+  <div id="workspace">
+    <div id="editors"></div>
+    <div id="previews"></div>
+  </div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

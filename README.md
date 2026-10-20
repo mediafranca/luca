@@ -1,5 +1,10 @@
 # luca
 
+**luca** es el editor Markdown de [Vera](https://github.com/mediafranca), parte
+del ecosistema **Media Franca** (`mediafranca/luca`). Un editor sencillo y
+rápido para elaborar el texto de una página antes de publicarla en Vera, con
+vista previa en vivo y diagramas Mermaid.
+
 Luca toma su nombre de Luca Pacioli, fraile franciscano y matemático del
 Renacimiento italiano. En [*Divina proportione*](https://es.wikipedia.org/wiki/La_divina_proporci%C3%B3n),
 publicado en 1509, Pacioli incluyó un estudio sobre la construcción geométrica
