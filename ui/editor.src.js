@@ -10,13 +10,16 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 
-// Interlínea FIJA en píxeles: cada línea mide lo mismo pase lo que pase con la
-// carga de la fuente, así numeración y contenido no se desalinean.
-const LH = "22px";
+// Tamaño e interlínea del código salen del token --code-size (Preferencias).
+// La interlínea se deriva del tamaño, no de la métrica de la fuente: cada línea
+// mide lo mismo pase lo que pase con la carga, y numeración y contenido no se
+// desalinean (13.5px × 1.63 ≈ 22px).
+const FS = "var(--code-size, 13.5px)";
+const LH = `calc(${FS} * 1.63)`;
 function editorTheme(dark) {
   return EditorView.theme(
     {
-      "&": { color: "var(--code-text, var(--text))", backgroundColor: "var(--code-bg, var(--bg))", fontSize: "13.5px", lineHeight: LH },
+      "&": { color: "var(--code-text, var(--text))", backgroundColor: "var(--code-bg, var(--bg))", fontSize: FS, lineHeight: LH },
       // CodeMirror fija font-family en .cm-scroller; hay que ponerla AQUÍ o la pisa.
       ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: LH },
       ".cm-content": { caretColor: "var(--accent)", padding: "20px 20px", lineHeight: LH },
@@ -26,6 +29,9 @@ function editorTheme(dark) {
       ".cm-lineNumbers .cm-gutterElement": { lineHeight: LH, padding: "0 10px 0 16px" },
       ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
       ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--code-text, var(--text))" },
+      // Selección en acento: legible tanto con panel claro como oscuro.
+      ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+        backgroundColor: "color-mix(in srgb, var(--accent) 28%, transparent)" },
     },
     { dark },
   );

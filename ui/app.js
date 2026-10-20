@@ -555,21 +555,20 @@ export const VERA_DEFAULTS = {
     "--text-size": "16px",
     "--line-height": "1.55",
     "--content-width": "45em",
+    "--code-size": "13.5px",
+    "--code-width": "48em",
   },
   light: {
-    "--bg": "#e6ebe9",
+    "--bg": "#fdfdfb",
     "--bg-raised": "#e8ebf1",
     "--text": "#454f6e",
     "--text-dim": "#6b7080",
-    "--code-bg": "#f4f6f8",
-    "--code-text": "#1e293b",
-    "--preview-bg": "#e6ebe9",
+    "--code-bg": "#d6dbdb",
+    "--code-text": "#606060",
+    "--preview-bg": "#f3faf9",
     "--preview-text": "#454f6e",
     "--rule": "#d1d1d2",
     "--accent": "#a84a0b",
-    "--warm": "#e6706a",
-    "--link-in": "#045591",
-    "--link-out": "#a84a0b",
   },
   dark: {
     "--bg": "#2e0024",
@@ -582,9 +581,6 @@ export const VERA_DEFAULTS = {
     "--preview-text": "#cde0cf",
     "--rule": "#24001c",
     "--accent": "#ee895d",
-    "--warm": "#ec9d98",
-    "--link-in": "#6fa8d0",
-    "--link-out": "#ee895d",
   },
 };
 
@@ -597,16 +593,20 @@ const FONT_STACKS = [
   ["Sans del sistema", "system-ui, sans-serif"],
 ];
 
+// Código y lectura se ajustan por separado: fuente, tamaño y ancho de columna.
 const GENERAL_TOKENS_META = [
-  { group: "Tipografía" },
-  { name: "--font-mono", label: "Código / Editor", kind: "font" },
-  { name: "--font-read", label: "Texto de lectura (Vista previa)", kind: "font" },
-  { name: "--font-body", label: "Cuerpo general", kind: "font" },
-  { name: "--font-ui", label: "Interfaz", kind: "font" },
-  { group: "Medida" },
+  { group: "Código" },
+  { name: "--font-mono", label: "Fuente", kind: "font" },
+  { name: "--code-size", label: "Tamaño de texto", kind: "text" },
+  { name: "--code-width", label: "Ancho de columna", kind: "text" },
+  { group: "Lectura (vista previa)" },
+  { name: "--font-read", label: "Fuente", kind: "font" },
   { name: "--text-size", label: "Tamaño de texto", kind: "text" },
   { name: "--line-height", label: "Interlínea", kind: "text" },
   { name: "--content-width", label: "Ancho de columna", kind: "text" },
+  { group: "Interfaz" },
+  { name: "--font-body", label: "Cuerpo general", kind: "font" },
+  { name: "--font-ui", label: "Interfaz", kind: "font" },
 ];
 
 const COLOR_TOKENS_META = [
@@ -616,7 +616,7 @@ const COLOR_TOKENS_META = [
   { name: "--text", label: "Texto de aplicación" },
   { name: "--text-dim", label: "Texto tenue / metadatos" },
   { name: "--rule", label: "Líneas divisorias y bordes" },
-  { name: "--accent", label: "Color de acento" },
+  { name: "--accent", label: "Color de acento (también enlaces y énfasis)" },
 
   { group: "Editor de código (Code)" },
   { name: "--code-bg", label: "Fondo del editor de código" },
@@ -625,11 +625,6 @@ const COLOR_TOKENS_META = [
   { group: "Vista previa / Lectura (Preview)" },
   { name: "--preview-bg", label: "Fondo de vista previa" },
   { name: "--preview-text", label: "Texto de vista previa" },
-
-  { group: "Enlaces y énfasis" },
-  { name: "--warm", label: "Énfasis cálido" },
-  { name: "--link-in", label: "Enlace entrante" },
-  { name: "--link-out", label: "Enlace saliente" },
 ];
 
 function loadTokens() {
@@ -925,7 +920,20 @@ function resetTokens() {
 }
 
 if (prefsEl) {
-  prefsEl.addEventListener("click", (e) => { if (e.target === prefsEl) closePrefs(); });
+  // Arrastre del panel desde su título; queda donde se suelte (dentro de la ventana).
+  prefsEl.querySelector(".prefs-panel h2")?.addEventListener("pointerdown", (e) => {
+    const r = prefsEl.getBoundingClientRect();
+    const dx = e.clientX - r.left, dy = e.clientY - r.top;
+    const move = (ev) => {
+      prefsEl.style.right = "auto";
+      prefsEl.style.left = `${Math.max(0, Math.min(innerWidth - r.width, ev.clientX - dx))}px`;
+      prefsEl.style.top = `${Math.max(0, Math.min(innerHeight - 40, ev.clientY - dy))}px`;
+    };
+    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", up);
+    e.preventDefault();
+  });
   document.getElementById("prefsClose")?.addEventListener("click", closePrefs);
   document.getElementById("prefsReset")?.addEventListener("click", resetTokens);
   mermaidSel?.addEventListener("change", () => {
