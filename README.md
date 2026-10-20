@@ -61,7 +61,8 @@ código para macOS, Windows, Linux y —vía Tauri 2— móvil.
   comportamiento (ver abajo).
 - `scripts/vendor.mjs` — vendoriza mermaid/marked y empaqueta CodeMirror a
   `ui/vendor/` (`npm run vendor`, también en `beforeDevCommand`).
-- `icon.svg` — fuente del icono; regenerar el set con `cargo tauri icon icon.png`.
+- `icon.png` — fuente del icono (la «L» construida al modo de Pacioli);
+  regenerar el set con `cargo tauri icon icon.png`.
 
 ## Especificación (Allium)
 
