@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#f4f1ea"/>
+  <g transform="translate(512,512)">
+    <!-- círculo de construcción, al modo de Divina proportione -->
+    <circle r="300" fill="none" stroke="#c9b48a" stroke-width="6"/>
+    <rect x="-300" y="-300" width="600" height="600" fill="none" stroke="#c9b48a" stroke-width="6"/>
+    <line x1="-300" y1="0" x2="300" y2="0" stroke="#c9b48a" stroke-width="4"/>
+    <line x1="0" y1="-300" x2="0" y2="300" stroke="#c9b48a" stroke-width="4"/>
+    <!-- capital L construida -->
+    <path d="M -150 -250 L -60 -250 L -60 175 L 190 175 L 190 250 L -150 250 Z"
+          fill="#1a1a1a"/>
+  </g>
+</svg>

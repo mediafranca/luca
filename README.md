@@ -26,24 +26,36 @@ descubrirse después; para comenzar, basta abrirlo y escribir.
 ## Correr
 
 ```bash
-swift run
+cargo tauri dev
 ```
 
 Panel izquierdo: editor. Panel derecho: preview en vivo con **diagramas Mermaid**.
 
+Para empaquetar la app nativa del sistema actual:
+
+```bash
+cargo tauri build
+```
+
 ## Estado
 
-MVP ejecutable en **AppKit puro** (`NSTextView` + `WKWebView`) — compila con las
-Command Line Tools, sin necesidad de Xcode. Una ventana, editor + preview.
-
-Todavía **no** es una app de documentos (abrir/guardar `.md`, recientes, ventana
-por archivo); eso pide migrar a un proyecto Xcode con `NSDocument`.
+MVP **multiplataforma** sobre [Tauri 2](https://tauri.app): el frontend es web
+(`ui/`, Markdown con `marked` + diagramas con `mermaid`), envuelto en una cáscara
+nativa ligera. Una sola base de código sirve para macOS, Windows, Linux y —vía
+Tauri 2— móvil. El editor es un `<textarea>` con preview en vivo.
 
 - `marked` y `mermaid` se cargan desde CDN → requiere red. Vendorizar los dos
-  `.js` al bundle cuando importe el modo offline.
+  `.js` en `ui/` cuando importe el modo offline.
+
+## Estructura
+
+- `ui/` — frontend (HTML/CSS/JS, sin bundler).
+- `src-tauri/` — cáscara nativa (Rust + Tauri).
+- `icon.svg` — fuente del icono; regenerar el set con `cargo tauri icon icon.png`.
 
 ## Próximos pasos
 
-1. Abrir/guardar archivos (`NSOpenPanel`/`NSSavePanel`, o migrar a document-based).
-2. Vendorizar marked + mermaid (offline, carga instantánea).
-3. Debounce del render y scroll sincronizado.
+1. Abrir/guardar archivos (diálogos nativos de Tauri).
+2. Editor real con CodeMirror (resaltado de sintaxis).
+3. Vendorizar marked + mermaid (offline, carga instantánea).
+4. Exportar a Vera / publicación.
