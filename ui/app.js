@@ -369,6 +369,7 @@ addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === ",") { e.preventDefault(); openPrefs(); }
 });
 applyOverrides();
+buildTokenForm();
 
 // Esc sale del zen SIEMPRE: en fase de captura, antes de que CodeMirror lo tome.
 addEventListener("keydown", (e) => {
