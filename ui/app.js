@@ -241,6 +241,9 @@ function renderTabs() {
     close.className = "close";
     close.textContent = "×";
     close.title = "Cerrar";
+    // El mousedown del tab activa y redibuja las pestañas, lo que destruiría este botón
+    // antes del click: el × no lo propaga.
+    close.addEventListener("mousedown", (e) => e.stopPropagation());
     close.addEventListener("click", (e) => { e.stopPropagation(); closeDoc(doc); });
     tab.append(label, close);
     tab.addEventListener("mousedown", () => activate(doc));
