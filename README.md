@@ -87,6 +87,14 @@ una necesidad concreta.
 
 ## Próximos pasos
 
-1. Editor real con CodeMirror (resaltado de sintaxis, también para Mermaid).
-2. Packs de iconos de Mermaid (iconify-json: logos, fa, material-icon-theme).
-3. Protocolo de vinculación con Vera cuando se defina (single-instance / deep-link).
+1. Editar en modo *rendered* (WYSIWYG) — lo realmente «zen» del editor.
+2. Resolver rutas relativas de assets en la vista previa.
+3. Resaltado de sintaxis de Mermaid dentro del fence (gramática Lezer).
+4. Packs de iconos de Mermaid (iconify-json).
+
+## Autoría y licencia
+
+luca es obra de [Herbert Spencer González](https://github.com/hspencer), dentro
+de Media Franca. Publicado bajo la **Licencia Pública de la Unión Europea
+(EUPL 1.2)**: copyleft fuerte —en el espíritu de Vera (GPL-3.0)— pero más fina,
+con texto legal en español y compatible con GPL-3.0. Ver [LICENSE](LICENSE).

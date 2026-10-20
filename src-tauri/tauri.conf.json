@@ -26,9 +26,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "publisher": "hspencer",
+    "publisher": "Herbert Spencer González",
     "homepage": "https://github.com/hspencer",
-    "copyright": "© 2026 hspencer",
+    "copyright": "© 2026 Herbert Spencer González",
+    "license": "EUPL-1.2",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

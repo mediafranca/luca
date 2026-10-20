@@ -4,8 +4,9 @@
   "description": "Editor Markdown mínimo y rápido, con Mermaid offline.",
   "private": true,
   "type": "module",
-  "author": { "name": "hspencer", "email": "hspencer@ead.cl", "url": "https://github.com/hspencer" },
+  "author": { "name": "Herbert Spencer González", "url": "https://github.com/hspencer" },
   "repository": { "type": "git", "url": "https://github.com/mediafranca/luca" },
+  "license": "EUPL-1.2",
   "scripts": {
     "vendor": "node scripts/vendor.mjs"
   },

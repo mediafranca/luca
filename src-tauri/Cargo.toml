@@ -3,9 +3,10 @@ name = "luca"
 version = "0.1.0"
 edition = "2021"
 description = "Editor Markdown mínimo y rápido"
-authors = ["hspencer <hspencer@ead.cl>"]
+authors = ["Herbert Spencer González"]
 homepage = "https://github.com/hspencer"
 repository = "https://github.com/mediafranca/luca"
+license = "EUPL-1.2"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
