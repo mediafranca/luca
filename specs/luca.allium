@@ -13,6 +13,7 @@
 --   - Vocabulario compartido (Autor)
 --   - Modelo de documento y ciclo de vida multidocumento (documento.allium)
 --   - Superficies de edición y vista previa (vista-previa.allium)
+--   - Edición por bloques sobre la vista renderizada (edicion-renderizada.allium)
 --   - Contrato de integración con Vera (vera.allium)
 --
 -- Excludes:
@@ -24,6 +25,7 @@
 -- Modulos:
 --   documento.allium     -> entidad Documento, Espacio y reglas de ciclo de vida
 --   vista-previa.allium   -> superficies de editor y vista previa
+--   edicion-renderizada.allium -> modo renderizado editable por bloques
 --   vera.allium           -> contrato de lanzamiento e integración con Vera
 
 external entity Autor {

@@ -62,5 +62,7 @@ surface VistaPrevia {
 
     @guidance
         -- La vista previa es sólo una proyección: nunca es la fuente de verdad
-        -- ni altera el texto del documento.
+        -- ni altera el texto del documento. Esto describe el panel del modo
+        -- split; el modo renderizado es editable por bloques y se especifica
+        -- en edicion-renderizada.allium, siempre a través del texto fuente.
 }

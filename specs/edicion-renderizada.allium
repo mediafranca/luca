@@ -1,0 +1,231 @@
+-- allium: 3
+-- edicion-renderizada.allium — edición por bloques sobre la vista renderizada
+--
+-- Scope: el modo "renderizado" de luca deja de ser una proyección de sólo
+-- lectura y pasa a ser editable por bloques. El Autor señala un bloque en el
+-- texto renderizado, ese bloque muestra su Markdown fuente en el mismo lugar,
+-- el Autor lo edita y, al abandonarlo, el bloque vuelve a renderizarse. El
+-- texto del documento sigue siendo la única fuente de verdad: editar un bloque
+-- es editar el rango de líneas que lo produjo.
+--
+-- Decisiones (2026-10-20):
+--   1. Modelo: edición in situ del bloque, que al enfocar muestra su Markdown
+--      y al salir vuelve a renderizar (mismo criterio que Vera en
+--      block-editing.allium: lo dibujado y su fuente son dos vistas de un
+--      solo texto). No hay editor de texto rico ni serialización HTML→Markdown.
+--   2. Granularidad: el bloque. Se localiza como rango de líneas del texto.
+--   3. Lo que luca no interpreta no se interpreta: se muestra y se edita como
+--      texto, sin extensiones propias de sintaxis.
+--   4. Los fences (Mermaid y código) son bloques: se editan como texto y el
+--      diagrama o el código se vuelve a renderizar al salir.
+--   5. Este modo REEMPLAZA al modo rendered; no es un cuarto modo.
+--   6. Entrar y salir de un bloque sin cambiar nada deja el texto idéntico.
+--   7. Cursor e historial al cambiar de modo: no se exige nada.
+--   8. La barra de herramientas sigue actuando sobre el texto fuente. El bloque
+--      en edición conserva la tipografía del bloque renderizado; no aparece
+--      marco ni borde nuevo; a lo sumo cambia levemente el fondo.
+--
+-- Excludes:
+--   - Cómo se parte el Markdown en bloques (detalle del parser; aquí sólo se
+--     exige que el rango de un bloque sean líneas completas y contiguas)
+--   - La vista previa del modo split, que sigue siendo sólo lectura
+--     (vista-previa.allium)
+--   - Abrir, guardar y cerrar documentos (documento.allium)
+--
+-- Dependencies: luca.allium, documento.allium, vista-previa.allium
+
+use "./luca.allium" as luca
+use "./documento.allium" as documento
+
+------------------------------------------------------------
+-- Bloque y vista renderizada
+------------------------------------------------------------
+
+entity Bloque {
+    -- Un bloque Markdown de nivel superior (párrafo, encabezado, lista, cita,
+    -- fence, tabla, línea horizontal o texto que luca no interpreta). Es la
+    -- unidad de edición en la vista renderizada.
+    documento: documento/Documento
+    desde: Integer                  -- inicio de la primera línea del bloque
+    hasta: Integer                  -- fin de la última línea del bloque
+    fuente: String                  -- documento.contenido entre desde y hasta, tal cual
+    en_edicion: Boolean
+}
+
+entity VistaRenderizada {
+    -- El modo renderizado de un documento: sus bloques, uno de ellos quizá en edición.
+    documento: documento/Documento
+    bloques: Bloque with documento = this.documento
+    editando: bloques where en_edicion = true
+}
+
+given {
+    vista: VistaRenderizada
+}
+
+------------------------------------------------------------
+-- Invariantes
+------------------------------------------------------------
+
+invariant BloquesSonLineasCompletas {
+    -- Un bloque empieza al inicio de una línea y termina al final de otra;
+    -- los rangos no se solapan. Así "editar un bloque" es reemplazar un rango
+    -- de líneas, como ya hace el editor de tablas.
+    for b in vista.bloques:
+        b.desde <= b.hasta
+        (vista.bloques where this != b and desde <= b.hasta and hasta >= b.desde).count = 0
+}
+
+invariant ALoSumoUnBloqueEnEdicion {
+    -- Una sola tecla significa una sola cosa: se edita un bloque a la vez.
+    vista.editando.count <= 1
+}
+
+invariant LaFuenteEsElDocumento {
+    -- El bloque no guarda una copia: su fuente es literalmente el tramo del
+    -- documento entre desde y hasta, y nunca supera el documento.
+    for b in vista.bloques:
+        b.desde >= 0
+        b.hasta <= vista.documento.contenido.length
+        b.fuente.length = b.hasta - b.desde
+}
+
+------------------------------------------------------------
+-- Comenzar a editar
+------------------------------------------------------------
+
+rule ComenzarEdicionDeBloque {
+    -- El Autor señala un bloque renderizado. Ese bloque, y sólo ése, pasa a
+    -- mostrar su Markdown fuente en el mismo lugar que ocupaba renderizado.
+    when: AutorSenalaBloque(bloque)
+
+    requires: bloque in vista.bloques
+
+    ensures:
+        for b in vista.bloques:
+            b.en_edicion = (b = bloque)
+
+    @guarantee MuestraElMarkdownDelBloque
+        -- Lo que se ve al editar es la fuente tal cual (marcadores, fences,
+        -- sintaxis desconocida incluida), no una versión rica ni normalizada.
+
+    @guarantee EdicionSinMarco
+        -- El bloque en edición conserva la tipografía, el cuerpo, la medida y
+        -- la posición del bloque renderizado. No aparece marco, borde ni
+        -- caja nueva; como mucho cambia levemente el fondo del bloque. El
+        -- paso de leer a escribir no mueve el texto en la página.
+}
+
+------------------------------------------------------------
+-- Editar
+------------------------------------------------------------
+
+rule EditarBloque {
+    -- Teclear en el bloque reemplaza su rango en el documento. Es un
+    -- AutorEditaContenido con otro punto de entrada: marca sucio y no
+    -- altera nada fuera del rango del bloque.
+    when: AutorEditaBloque(bloque, fuente_nueva)
+
+    requires: bloque.en_edicion = true
+
+    ensures:
+        bloque.fuente = fuente_nueva
+        bloque.hasta = bloque.desde + fuente_nueva.length
+        vista.documento.sucio = true
+
+    @guarantee ReemplazaSoloElRango
+        -- documento.contenido pasa a ser: lo anterior a desde, tal cual +
+        -- fuente_nueva + lo posterior a hasta, tal cual. El texto fuera del
+        -- bloque queda byte a byte igual.
+
+    @guarantee BarraActuaSobreLaFuente
+        -- Las acciones de la barra (negrita, encabezado, lista, enlace, tabla…)
+        -- se aplican como marcadores sobre la selección en la fuente del bloque,
+        -- igual que en el modo código. La barra no opera sobre HTML.
+}
+
+------------------------------------------------------------
+-- Terminar de editar
+------------------------------------------------------------
+
+rule TerminarEdicionDeBloque {
+    -- El Autor abandona el bloque (clic fuera, Esc, cambio de modo o de
+    -- pestaña). El bloque vuelve a renderizarse desde su fuente actual.
+    when: AutorAbandonaBloque(bloque)
+
+    requires: bloque.en_edicion = true
+
+    ensures:
+        bloque.en_edicion = false
+
+    @guarantee IdaYVueltaByteFiel
+        -- Si el Autor entró y salió sin teclear, documento.contenido es
+        -- idéntico byte a byte al de antes de entrar. Entrar a editar nunca
+        -- normaliza, reindenta ni toca espacios finales.
+
+    @guarantee VuelveARenderizar
+        -- Al salir, el bloque se renderiza desde su fuente nueva. Si la fuente
+        -- cambió de forma que ahora son varios bloques, o se fundió con otro,
+        -- la vista refleja la partición nueva; el documento no se entera.
+
+    @guarantee MermaidYCodigoSonBloques
+        -- Un fence ```mermaid o de código se edita como texto y, al salir, el
+        -- diagrama o el código vuelven a renderizarse. Un diagrama con error
+        -- muestra el error en el lugar del bloque, como hoy en la vista previa;
+        -- el fence sigue siendo texto en el documento (MermaidEsTexto).
+}
+
+------------------------------------------------------------
+-- Superficie: el modo renderizado, ahora editable
+------------------------------------------------------------
+
+surface VistaRenderizadaEditable {
+    facing autor: luca/Autor
+    context vista: VistaRenderizada
+
+    exposes:
+        vista.bloques                   -- renderizados como Markdown → HTML
+        for b in vista.editando:
+            b.fuente                    -- el Markdown del bloque en edición
+
+    provides:
+        AutorSenalaBloque(b)
+            when b in vista.bloques
+        AutorEditaBloque(b, fuente_nueva)
+            when b in vista.editando
+        AutorAbandonaBloque(b)
+            when b in vista.editando
+
+    @guarantee ReemplazaAlModoRendered
+        -- Esta superficie ES el modo renderizado (⌘3): no se añade un cuarto
+        -- modo. La vista previa del modo split sigue siendo sólo lectura; el
+        -- editor de código está a su lado.
+
+    @guarantee NoInterpretaLoDesconocido
+        -- Lo que el render no entiende (YAML inicial, líneas clave:: valor,
+        -- [[enlaces]], ++, ^, ~ …) se muestra como texto y se edita como
+        -- bloque de texto. luca no añade sintaxis propia ni la oculta
+        -- (PreservaSintaxisDesconocida).
+
+    @guarantee ElMarkdownSigueSiendoLaVerdad
+        -- No hay estado paralelo: cerrar el modo, cambiar de pestaña o guardar
+        -- toma el texto del documento, que ya contiene todo lo editado aquí.
+        -- Guardar desde este modo es el mismo GuardarDocumento, byte-fiel.
+
+    @guidance
+        -- Historial de deshacer y posición del cursor al pasar entre los modos
+        -- código y renderizado: no se exige nada. Compartir el historial del
+        -- editor de código es la opción más simple, no un requisito.
+
+    @guidance
+        -- Zen e impresión aplican igual: zen oculta las barras y centra la
+        -- medida; imprimir toma el documento renderizado sin bloque en edición.
+}
+
+------------------------------------------------------------
+-- Pendientes
+------------------------------------------------------------
+
+open question "Dónde cae el cursor al señalar un bloque: en la palabra señalada (como exige Vera en TheCaretBeginsWhereItWasPut) o al final del bloque. No decidido."
+
+open question "Enter al final de un párrafo en edición: ¿crea un bloque nuevo y lo deja en edición, o inserta un salto dentro del mismo bloque? No decidido."
