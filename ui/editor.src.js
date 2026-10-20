@@ -10,15 +10,22 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 
+const LH = "1.65";
 function editorTheme(dark) {
   return EditorView.theme(
     {
-      "&": { color: "var(--text)", backgroundColor: "var(--bg)" },
-      ".cm-content": { caretColor: "var(--accent)", padding: "20px 24px" },
+      // Tamaño y familia en la raíz del editor: contenido y numeración heredan
+      // lo mismo, así no se desalinean.
+      "&": { color: "var(--text)", backgroundColor: "var(--bg)",
+             fontFamily: "var(--font-mono)", fontSize: "13.5px" },
+      ".cm-scroller": { lineHeight: LH },
+      ".cm-content": { caretColor: "var(--accent)", padding: "20px 20px", lineHeight: LH },
+      ".cm-line": { padding: "0 2px" },
       ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
-      ".cm-gutters": { backgroundColor: "var(--bg)", color: "var(--text-dim)", border: "none" },
+      ".cm-gutters": { backgroundColor: "var(--bg)", color: "var(--text-dim)", border: "none",
+                       fontSize: "11.5px" },
+      ".cm-lineNumbers .cm-gutterElement": { padding: "0 10px 0 14px" },
       ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--text)" },
-      ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--line-height, 1.6)" },
     },
     { dark },
   );
@@ -53,6 +60,12 @@ export function createMarkdownEditor({ parent, doc, dark, onChange }) {
       ],
     }),
   });
+  // Recalcular medidas cuando Plex Mono termine de cargar: evita que la
+  // numeración y el contenido queden desalineados por medir con otra fuente.
+  if (typeof document !== "undefined" && document.fonts?.ready) {
+    document.fonts.ready.then(() => view.requestMeasure()).catch(() => {});
+  }
+
   return {
     getDoc: () => view.state.doc.toString(),
     setDoc: (text) =>

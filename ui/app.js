@@ -30,14 +30,42 @@ await mermaid.registerLayoutLoaders(elkMod.default);
 await mermaid.registerLayoutLoaders(tidyMod.default);
 await mermaid.registerExternalDiagrams([zenumlMod.default]);
 
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const mermaidTheme = () => { try { return localStorage.getItem("luca.mermaidTheme") || "vera"; } catch { return "vera"; } };
+
+// Mermaid: por defecto "vera" = tema 'base' tokenizado a los colores de Vera,
+// así el diagrama hereda la paleta de la app (claro/oscuro). El usuario puede
+// elegir otro preset desde Preferencias.
 function initMermaid() {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: dark() ? "dark" : "default",
-    securityLevel: "loose",
-    maxTextSize: 10_000_000,
-    maxEdges: 2000,
-  });
+  const base = { startOnLoad: false, securityLevel: "loose", maxTextSize: 10_000_000, maxEdges: 2000 };
+  const choice = mermaidTheme();
+  if (choice === "vera") {
+    mermaid.initialize({
+      ...base,
+      theme: "base",
+      themeVariables: {
+        darkMode: dark(),
+        background: cssVar("--bg"),
+        mainBkg: cssVar("--bg-raised"),
+        primaryColor: cssVar("--bg-raised"),
+        primaryTextColor: cssVar("--text"),
+        primaryBorderColor: cssVar("--rule"),
+        secondaryColor: cssVar("--bg"),
+        tertiaryColor: cssVar("--bg"),
+        nodeBorder: cssVar("--rule"),
+        clusterBkg: cssVar("--bg"),
+        clusterBorder: cssVar("--rule"),
+        lineColor: cssVar("--text-dim"),
+        textColor: cssVar("--text"),
+        titleColor: cssVar("--text"),
+        edgeLabelBackground: cssVar("--bg"),
+        fontFamily: "var(--font-body)",
+        fontSize: "14px",
+      },
+    });
+  } else {
+    mermaid.initialize({ ...base, theme: choice });
+  }
 }
 
 // marked: los fences ```mermaid salen como <pre class="mermaid"> con el código crudo.
@@ -69,8 +97,8 @@ const dark = () => matchMedia("(prefers-color-scheme: dark)").matches;
 const baseName = (p) => (p ? p.split(/[\\/]/).pop() : "sin título");
 
 async function setTitle() {
-  const name = active ? `${baseName(active.path)}${active.dirty ? " •" : ""}` : "luca";
-  try { await TAURI?.window.getCurrentWindow().setTitle(`${name} — luca`); } catch {}
+  const name = active ? `${baseName(active.path)}${active.dirty ? " •" : ""}` : "Luca";
+  try { await TAURI?.window.getCurrentWindow().setTitle(`${name} — Luca`); } catch {}
 }
 
 async function renderDoc(doc) {
@@ -189,18 +217,36 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   for (const d of docs) { d.ed.setDark(dark()); renderDoc(d); }
 });
 
-addEventListener("keydown", (e) => {
-  if (!(e.metaKey || e.ctrlKey)) return;
-  const k = e.key.toLowerCase();
-  if (k === "n") { e.preventDefault(); newDoc(); }
-  else if (k === "w") { e.preventDefault(); if (active) closeDoc(active); }
-  else if (!TAURI) return; // abrir/guardar sólo dentro de la app
-  else if (k === "o") { e.preventDefault(); openFile(); }
-  else if (k === "s") { e.preventDefault(); if (active) saveDoc(active, e.shiftKey); }
-});
+// Atajos por teclado SOLO fuera de Tauri (en la app los maneja el menú nativo).
+if (!TAURI) {
+  addEventListener("keydown", (e) => {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === "n") { e.preventDefault(); newDoc(); }
+    else if (k === "w") { e.preventDefault(); if (active) closeDoc(active); }
+    else if (e.shiftKey && k === "z") { e.preventDefault(); toggleZen(); }
+    else if (e.key === "1") { e.preventDefault(); applyMode("source"); }
+    else if (e.key === "2") { e.preventDefault(); applyMode("split"); }
+    else if (e.key === "3") { e.preventDefault(); applyMode("rendered"); }
+  });
+}
 
 if (TAURI) {
   TAURI.event.listen("open-file", (e) => openPath(e.payload)); // apertura en caliente: añade pestaña
+  TAURI.event.listen("menu", (e) => {
+    const id = e.payload, a = active;
+    if (id === "new") newDoc();
+    else if (id === "open") openFile();
+    else if (id === "save") { if (a) saveDoc(a, false); }
+    else if (id === "save_as") { if (a) saveDoc(a, true); }
+    else if (id === "close_tab") { if (a) closeDoc(a); }
+    else if (id === "export_pdf") exportPdf();
+    else if (id === "prefs_mermaid") openPrefs();
+    else if (id === "mode_source") applyMode("source");
+    else if (id === "mode_split") applyMode("split");
+    else if (id === "mode_rendered") applyMode("rendered");
+    else if (id === "zen") toggleZen();
+  });
 }
 
 // ---------- Modos de vista (source · split · rendered) y zen ----------
@@ -218,7 +264,40 @@ function toggleZen(force) {
 for (const b of document.querySelectorAll("#modebar button[data-mode]"))
   b.addEventListener("click", () => applyMode(b.dataset.mode));
 document.getElementById("zen").addEventListener("click", () => toggleZen());
-document.getElementById("zenexit").addEventListener("click", () => toggleZen(false));
+
+// Exportar a PDF: @media print en index.html deja sólo la vista previa activa;
+// el diálogo de impresión de macOS ofrece «Guardar como PDF».
+function exportPdf() { window.print(); }
+
+// Preferencias: tipografía de lectura (separada del código, que es siempre
+// mono) y tema de Mermaid. El editor de tokens llegará aquí.
+const DEFAULT_READ_FONT = "'Roboto Serif', Georgia, serif";
+const readFontPref = () => { try { return localStorage.getItem("luca.readFont") || DEFAULT_READ_FONT; } catch { return DEFAULT_READ_FONT; } };
+const applyReadFont = (v) => document.documentElement.style.setProperty("--font-read", v);
+
+const prefsEl = document.getElementById("prefs");
+const mermaidSel = document.getElementById("mermaidTheme");
+const readSel = document.getElementById("readFont");
+function openPrefs() {
+  if (mermaidSel) mermaidSel.value = mermaidTheme();
+  if (readSel) readSel.value = readFontPref();
+  if (prefsEl) prefsEl.hidden = false;
+}
+function closePrefs() { if (prefsEl) prefsEl.hidden = true; }
+if (prefsEl) {
+  prefsEl.addEventListener("click", (e) => { if (e.target === prefsEl) closePrefs(); });
+  document.getElementById("prefsClose").addEventListener("click", closePrefs);
+  mermaidSel.addEventListener("change", () => {
+    try { localStorage.setItem("luca.mermaidTheme", mermaidSel.value); } catch {}
+    initMermaid();
+    for (const d of docs) renderDoc(d);
+  });
+  readSel.addEventListener("change", () => {
+    try { localStorage.setItem("luca.readFont", readSel.value); } catch {}
+    applyReadFont(readSel.value);
+  });
+}
+applyReadFont(readFontPref());
 
 // Esc sale del zen SIEMPRE: en fase de captura, antes de que CodeMirror lo tome.
 addEventListener("keydown", (e) => {
@@ -227,14 +306,6 @@ addEventListener("keydown", (e) => {
     toggleZen(false);
   }
 }, true);
-
-addEventListener("keydown", (e) => {
-  const cmd = e.metaKey || e.ctrlKey;
-  if (cmd && e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); toggleZen(); }
-  else if (cmd && e.key === "1") { e.preventDefault(); applyMode("source"); }
-  else if (cmd && e.key === "2") { e.preventDefault(); applyMode("split"); }
-  else if (cmd && e.key === "3") { e.preventDefault(); applyMode("rendered"); }
-});
 
 // Estado inicial, recordado por visor (localStorage es una comodidad local).
 let mode0 = "split", zen0 = "off";
@@ -254,7 +325,11 @@ flowchart LR
 
 initMermaid();
 
-// Arranque: si Vera/Finder lanzaron luca con un archivo, ábrelo; si no, el ejemplo.
+// Esperar a que las fuentes carguen ANTES de montar el editor, para que
+// CodeMirror mida las líneas con Plex Mono y no queden desalineadas.
+if (document.fonts?.ready) { try { await document.fonts.ready; } catch {} }
+
+// Arranque: si Vera/Finder lanzaron Luca con un archivo, ábrelo; si no, el ejemplo.
 const pending = TAURI ? await TAURI.core.invoke("take_opened_file") : null;
 if (pending) await openPath(pending);
 else makeDoc(SAMPLE, null);
