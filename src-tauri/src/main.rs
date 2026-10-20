@@ -4,8 +4,10 @@ use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
+// Sólo Windows y Linux reciben el archivo como argumento; en macOS el módulo
+// se compila únicamente para sus pruebas.
+#[cfg(any(target_os = "windows", target_os = "linux", test))]
 mod file_argument;
-use file_argument::first_local_file_argument;
 
 // Archivo pendiente de apertura en frío (Finder / "Abrir con…" de Vera lanzan
 // la app antes de que el frontend registre el listener).
@@ -123,7 +125,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![read_file, write_file, stat, take_opened_file])
         .setup(|app| {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            if let Some(path) = first_local_file_argument(std::env::args_os()) {
+            if let Some(path) = file_argument::first_local_file_argument(std::env::args_os()) {
                 *app.state::<Pending>().0.lock().unwrap() = Some(path);
             }
             build_menu(app)?;
