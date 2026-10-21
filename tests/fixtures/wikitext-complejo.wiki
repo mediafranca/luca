@@ -1,0 +1,17 @@
+== Café y geometría ==
+
+{{Ficha desconocida
+ | nombre = Luca
+ | medida = 55&nbsp;em
+ | datos = {{{parámetro|''sin valor''}}}
+}}
+
+<!-- Comentario que Luca debe preservar literalmente -->
+clave:: valor sin interpretar
+<extension-rara atributo="áéíóú">contenido</extension-rara>
+
+{| class="wikitable"
+! Columna !! Otra
+|-
+| [[Página interna|texto]] || [https://example.org enlace]
+|}

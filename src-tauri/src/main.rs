@@ -7,6 +7,9 @@ use std::{collections::HashMap, sync::atomic::AtomicUsize};
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
+mod file_io;
+use file_io::{mtime_ms, read_text_file, write_text_file};
+
 const MAX_WIKI_RESPONSE: u64 = 5 * 1024 * 1024;
 
 fn navigation_allowed(scheme: &str, host: Option<&str>, debug: bool) -> bool {
@@ -254,17 +257,14 @@ fn window_at_point(app: tauri::AppHandle, x: f64, y: f64, exclude: String) -> Op
 // I/O byte-fiel: el archivo se guarda tal cual lo escribió el usuario.
 #[tauri::command]
 fn read_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+    read_text_file(path)
 }
 
 // Guardado atómico: escribe a un temporal y lo renombra sobre el destino
 // (rename es atómico en el mismo volumen). Devuelve el mtime resultante en ms.
 #[tauri::command]
 fn write_file(path: String, contents: String) -> Result<u64, String> {
-    let tmp = format!("{path}.luca-tmp");
-    std::fs::write(&tmp, contents).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
-    mtime_ms(&path)
+    write_text_file(path, contents)
 }
 
 // mtime en ms desde epoch, para detectar cambios externos antes de sobrescribir.
@@ -292,31 +292,6 @@ fn allow_preview_asset(app: tauri::AppHandle, path: String) -> Result<String, St
         .allow_file(&canonical)
         .map_err(|e| e.to_string())?;
     Ok(canonical.to_string_lossy().into_owned())
-}
-
-fn mtime_ms(path: &str) -> Result<u64, String> {
-    let modified = std::fs::metadata(path)
-        .and_then(|m| m.modified())
-        .map_err(|e| e.to_string())?;
-    modified
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .map_err(|e| e.to_string())
-}
-
-#[cfg(test)]
-mod io_tests {
-    use super::{read_file, write_file};
-
-    #[test]
-    fn wikitext_se_guarda_sin_alterar_bytes_ni_saltos() {
-        let path = std::env::temp_dir().join(format!("luca-wikitext-{}.wiki", std::process::id()));
-        let source = "== Título ==\r\n{{Plantilla|desconocido=<tag x=\"1\">}}\r\nclave:: valor\r\n";
-        write_file(path.to_string_lossy().into_owned(), source.to_string()).unwrap();
-        let result = read_file(path.to_string_lossy().into_owned()).unwrap();
-        assert_eq!(result.as_bytes(), source.as_bytes());
-        std::fs::remove_file(path).unwrap();
-    }
 }
 
 #[tauri::command]

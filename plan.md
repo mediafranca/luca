@@ -139,7 +139,7 @@ El formato pertenece a cada documento, no a toda la aplicación.
   Markdown en un documento Wikitext.
 - [x] Añadir asociaciones de archivo, filtros de apertura/guardado, MIME e iconos
   para `.wiki` y `.wikitext` en todos los instaladores.
-- [ ] Añadir fixtures reales y pruebas que demuestren que abrir y guardar Wikitext
+- [x] Añadir fixtures reales y pruebas que demuestren que abrir y guardar Wikitext
   no altera bytes, saltos de línea ni sintaxis desconocida.
 - [x] Actualizar README, guía de uso, ayuda, Acerca de y metadatos: Luca dejará de
   describirse como exclusivamente Markdown.
