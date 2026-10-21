@@ -607,6 +607,8 @@ const FONT_STACKS = [
   ["IBM Plex Serif", "'IBM Plex Serif', Georgia, serif"],
   ["Roboto", "'Roboto', system-ui, sans-serif"],
   ["JetBrains Mono", "'JetBrains Mono', ui-monospace, Menlo, monospace"],
+  ["Fira Code", "'Fira Code', ui-monospace, Menlo, monospace"],
+  ["Source Serif 4", "'Source Serif 4', Georgia, serif"],
   ["Mono del sistema", "ui-monospace, 'SF Mono', Menlo, monospace"],
   ["Serif del sistema", "Georgia, 'Times New Roman', serif"],
   ["Sans del sistema", "system-ui, sans-serif"],
