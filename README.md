@@ -14,6 +14,11 @@ Consulta la **[Guía de uso](docs/uso.md)** para conocer los modos de edición,
 atajos, tablas, diagramas, preferencias y apertura desde el sistema o la línea
 de comandos.
 
+La **[política de privacidad y conectividad](docs/privacidad.md)** explica qué
+datos permanecen locales y cuándo Luca consulta una wiki. La
+[línea base de rendimiento](docs/rendimiento.md) registra tamaños y el protocolo
+para las mediciones nativas.
+
 ## Descargar
 
 [Última versión](https://github.com/mediafranca/luca/releases/latest). En

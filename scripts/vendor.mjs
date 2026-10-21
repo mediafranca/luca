@@ -19,7 +19,9 @@ mkdirSync(out, { recursive: true });
 
 // El diálogo Acerca de Luca usa la misma fuente maestra que todos los paquetes;
 // no mantenemos otra copia manual del icono dentro del frontend.
-copyFileSync(join(root, "icon.png"), join(out, "luca-icon.png"));
+// La interfaz no necesita la fuente maestra de 1024 px: reutiliza la variante
+// de 512 px generada para Tauri y evita sumar casi 1 MiB al runtime.
+copyFileSync(join(root, "src-tauri", "icons", "icon.png"), join(out, "luca-icon.png"));
 mkdirSync(join(out, "dompurify"), { recursive: true });
 copyFileSync(join(root, "node_modules", "dompurify", "dist", "purify.es.mjs"), join(out, "dompurify", "purify.es.mjs"));
 

@@ -9,6 +9,26 @@ use tauri::{Emitter, Manager};
 
 const MAX_WIKI_RESPONSE: u64 = 5 * 1024 * 1024;
 
+fn navigation_allowed(scheme: &str, host: Option<&str>, debug: bool) -> bool {
+    scheme == "tauri"
+        || matches!(host, Some("tauri.localhost"))
+        || (debug && matches!(host, Some("localhost" | "127.0.0.1")))
+}
+
+#[cfg(test)]
+mod navigation_tests {
+    use super::navigation_allowed;
+
+    #[test]
+    fn la_interfaz_no_navega_a_la_web() {
+        assert!(navigation_allowed("tauri", Some("localhost"), false));
+        assert!(navigation_allowed("https", Some("tauri.localhost"), false));
+        assert!(!navigation_allowed("https", Some("example.org"), false));
+        assert!(!navigation_allowed("file", None, false));
+        assert!(navigation_allowed("http", Some("127.0.0.1"), true));
+    }
+}
+
 #[derive(serde::Deserialize)]
 struct ParseEnvelope {
     parse: Option<ParseResult>,
@@ -129,9 +149,19 @@ fn transfer_tab(
         return Err("La ventana de destino ya no existe".into());
     }
     if let Some(path) = payload.get("path").and_then(|value| value.as_str()) {
-        registry.owners.lock().unwrap().insert(path.to_string(), target.clone());
+        registry
+            .owners
+            .lock()
+            .unwrap()
+            .insert(path.to_string(), target.clone());
     }
-    registry.transfers.lock().unwrap().entry(target.clone()).or_default().push(payload);
+    registry
+        .transfers
+        .lock()
+        .unwrap()
+        .entry(target.clone())
+        .or_default()
+        .push(payload);
     let _ = app.emit_to(&target, "tab-transfer-available", ());
     Ok(())
 }
@@ -141,7 +171,12 @@ fn take_transferred_tabs(
     registry: tauri::State<WindowRegistry>,
     window_label: String,
 ) -> Vec<serde_json::Value> {
-    registry.transfers.lock().unwrap().remove(&window_label).unwrap_or_default()
+    registry
+        .transfers
+        .lock()
+        .unwrap()
+        .remove(&window_label)
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -171,8 +206,14 @@ fn release_document(registry: tauri::State<WindowRegistry>, path: String, window
 
 #[tauri::command]
 fn focus_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
-    let window = app.get_webview_window(&label).ok_or_else(|| "La ventana ya no existe".to_string())?;
-    window.show().and_then(|_| window.unminimize()).and_then(|_| window.set_focus()).map_err(|e| e.to_string())
+    let window = app
+        .get_webview_window(&label)
+        .ok_or_else(|| "La ventana ya no existe".to_string())?;
+    window
+        .show()
+        .and_then(|_| window.unminimize())
+        .and_then(|_| window.set_focus())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -180,7 +221,11 @@ fn gather_windows(app: tauri::AppHandle, target: String) -> Result<(), String> {
     if app.get_webview_window(&target).is_none() {
         return Err("La ventana de destino ya no existe".into());
     }
-    for label in app.webview_windows().keys().filter(|label| *label != &target) {
+    for label in app
+        .webview_windows()
+        .keys()
+        .filter(|label| *label != &target)
+    {
         let _ = app.emit_to(label, "gather-tabs", target.clone());
     }
     focus_window(app, target)
@@ -189,7 +234,9 @@ fn gather_windows(app: tauri::AppHandle, target: String) -> Result<(), String> {
 #[tauri::command]
 fn window_at_point(app: tauri::AppHandle, x: f64, y: f64, exclude: String) -> Option<String> {
     for (label, window) in app.webview_windows() {
-        if label == exclude || !window.is_visible().unwrap_or(false) { continue; }
+        if label == exclude || !window.is_visible().unwrap_or(false) {
+            continue;
+        }
         let scale = window.scale_factor().ok()?;
         let position = window.outer_position().ok()?;
         let size = window.outer_size().ok()?;
@@ -197,7 +244,9 @@ fn window_at_point(app: tauri::AppHandle, x: f64, y: f64, exclude: String) -> Op
         let top = position.y as f64 / scale;
         let right = left + size.width as f64 / scale;
         let bottom = top + size.height as f64 / scale;
-        if x >= left && x <= right && y >= top && y <= bottom { return Some(label); }
+        if x >= left && x <= right && y >= top && y <= bottom {
+            return Some(label);
+        }
     }
     None
 }
@@ -224,6 +273,27 @@ fn stat(path: String) -> Option<u64> {
     mtime_ms(&path).ok()
 }
 
+#[tauri::command]
+fn allow_preview_asset(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    const MEDIA_EXTENSIONS: &[&str] = &[
+        "apng", "avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "webp", "aac", "flac", "m4a",
+        "mp3", "oga", "ogg", "wav", "m4v", "mov", "mp4", "ogv", "webm",
+    ];
+    let canonical = std::fs::canonicalize(path).map_err(|e| e.to_string())?;
+    let extension = canonical
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
+        .ok_or_else(|| "El recurso local no tiene una extensión multimedia".to_string())?;
+    if !MEDIA_EXTENSIONS.contains(&extension.as_str()) {
+        return Err("El recurso local no es un formato multimedia permitido".into());
+    }
+    app.asset_protocol_scope()
+        .allow_file(&canonical)
+        .map_err(|e| e.to_string())?;
+    Ok(canonical.to_string_lossy().into_owned())
+}
+
 fn mtime_ms(path: &str) -> Result<u64, String> {
     let modified = std::fs::metadata(path)
         .and_then(|m| m.modified())
@@ -232,6 +302,21 @@ fn mtime_ms(path: &str) -> Result<u64, String> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod io_tests {
+    use super::{read_file, write_file};
+
+    #[test]
+    fn wikitext_se_guarda_sin_alterar_bytes_ni_saltos() {
+        let path = std::env::temp_dir().join(format!("luca-wikitext-{}.wiki", std::process::id()));
+        let source = "== Título ==\r\n{{Plantilla|desconocido=<tag x=\"1\">}}\r\nclave:: valor\r\n";
+        write_file(path.to_string_lossy().into_owned(), source.to_string()).unwrap();
+        let result = read_file(path.to_string_lossy().into_owned()).unwrap();
+        assert_eq!(result.as_bytes(), source.as_bytes());
+        std::fs::remove_file(path).unwrap();
+    }
 }
 
 #[tauri::command]
@@ -362,8 +447,16 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
 
     let ventana = SubmenuBuilder::new(app, "Ventana")
-        .item(&item("new_window", "Nueva ventana", Some("CmdOrCtrl+Shift+N"))?)
-        .item(&item("detach_tab", "Mover pestaña a nueva ventana", Some("CmdOrCtrl+Shift+M"))?)
+        .item(&item(
+            "new_window",
+            "Nueva ventana",
+            Some("CmdOrCtrl+Shift+N"),
+        )?)
+        .item(&item(
+            "detach_tab",
+            "Mover pestaña a nueva ventana",
+            Some("CmdOrCtrl+Shift+M"),
+        )?)
         .item(&item(
             "move_tab_left",
             "Mover pestaña a la izquierda",
@@ -419,10 +512,7 @@ fn main() {
         .plugin(
             tauri::plugin::Builder::new("navigation-guard")
                 .on_navigation(|_, url| {
-                    url.scheme() == "tauri"
-                        || matches!(url.host_str(), Some("tauri.localhost"))
-                        || (cfg!(debug_assertions)
-                            && matches!(url.host_str(), Some("localhost" | "127.0.0.1")))
+                    navigation_allowed(url.scheme(), url.host_str(), cfg!(debug_assertions))
                 })
                 .build(),
         )
@@ -452,6 +542,7 @@ fn main() {
             read_file,
             write_file,
             stat,
+            allow_preview_asset,
             take_opened_files,
             take_new_document,
             print_with_margins,

@@ -7,7 +7,16 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const tauriRoot = join(root, "src-tauri");
 const config = JSON.parse(readFileSync(join(tauriRoot, "tauri.conf.json"), "utf8"));
+const capability = JSON.parse(readFileSync(join(tauriRoot, "capabilities", "default.json"), "utf8"));
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const packageLock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8"));
+const cargoToml = readFileSync(join(tauriRoot, "Cargo.toml"), "utf8");
 const bundle = config.bundle;
+
+assert.equal(config.version, packageJson.version, "package.json y Tauri deben compartir versión");
+assert.equal(packageLock.version, packageJson.version, "package-lock.json debe compartir versión");
+assert.equal(packageLock.packages[""].version, packageJson.version, "la raíz del lockfile debe compartir versión");
+assert.equal(cargoToml.match(/^version = "([^"]+)"/m)?.[1], packageJson.version, "Cargo debe compartir versión");
 
 assert.equal(bundle.category, "Productivity");
 assert.match(bundle.shortDescription, /Markdown/i);
@@ -18,6 +27,10 @@ assert.equal(bundle.fileAssociations[1].mimeType, "text/x-wiki");
 assert.deepEqual(bundle.fileAssociations[1].ext, ["wiki", "wikitext"]);
 assert.ok(existsSync(join(root, "node_modules", "dompurify", "dist", "purify.es.mjs")));
 assert.doesNotMatch(config.app.security.csp, /cdn\.jsdelivr\.net/);
+assert.deepEqual(config.app.security.assetProtocol.scope, [], "los assets locales se autorizan por archivo en runtime");
+const opener = capability.permissions.find((permission) => permission?.identifier === "opener:allow-open-url");
+assert.deepEqual(opener?.allow, [{ url: "https://*" }, { url: "http://*" }]);
+assert.equal(capability.permissions.includes("opener:allow-default-urls"), false);
 
 const expectedIcons = {
   "icons/32x32.png": [32, 32],

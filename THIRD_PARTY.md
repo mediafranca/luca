@@ -16,7 +16,16 @@ publican bajo **GPL-2.0-or-later**. Su código fuente y licencia se encuentran e
 Luca usa sólo la gramática local de resaltado; no activa las extensiones que
 dependen de CDN, lint remoto o navegación web.
 
-La evaluación de `0.12.1` registra avisos de auditoría transitivos en las
-herramientas de lint incluidas por el paquete. Esas herramientas no entran en el
-bundle de Luca; la construcción importa únicamente `mediawikiLanguage`. Se
-mantienen registradas para revisar cada actualización de la dependencia.
+La evaluación de `0.12.1` mediante `npm audit --omit=dev` (21-10-2026) registra
+avisos transitivos de severidad alta en `braces` dentro de las herramientas de
+lint incluidas por el paquete. Esas herramientas no entran en `ui/`; la
+construcción importa únicamente `mediawikiLanguage`. No hay corrección publicada
+sin sustituir la dependencia, por lo que el aviso se revisará en cada versión.
+
+## Mermaid y KaTeX
+
+La misma auditoría registra un aviso bajo de contaminación de prototipo en
+KaTeX, dependencia transitiva del adaptador ELK. La corrección sugerida por npm
+degrada `@mermaid-js/layout-elk` a una versión incompatible y no se aplica
+automáticamente. Luca configura Mermaid con contenido saneado, sin HTML activo,
+y conserva el aviso hasta que la cadena compatible publique una actualización.

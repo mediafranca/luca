@@ -75,31 +75,31 @@ web funcione fuera de Tauri.
 El README presenta el producto; una guía de uso separada debe explicar las
 funciones sin obligar a descubrirlas por accidente.
 
-- [ ] Crear `docs/uso.md` y enlazarlo prominentemente desde el README.
-- [ ] Documentar todos los atajos de archivo: nuevo, abrir, guardar, guardar como,
+- [x] Crear `docs/uso.md` y enlazarlo prominentemente desde el README.
+- [x] Documentar todos los atajos de archivo: nuevo, abrir, guardar, guardar como,
   cerrar pestaña, exportar PDF y preferencias.
-- [ ] Documentar los tres modos, el modo zen y la edición por bloques en vista
+- [x] Documentar los tres modos, el modo zen y la edición por bloques en vista
   mixta y renderizada.
-- [ ] Documentar la **multiselección**: `⌘D` / `Ctrl+D`, selección de la siguiente
+- [x] Documentar la **multiselección**: `⌘D` / `Ctrl+D`, selección de la siguiente
   aparición y operaciones simultáneas sobre los cursores.
-- [ ] Documentar reordenamiento de pestañas por arrastre y con
+- [x] Documentar reordenamiento de pestañas por arrastre y con
   `Alt+Shift+←/→`.
-- [ ] Documentar instancia única, deduplicación por ruta y apertura de varios
+- [x] Documentar instancia única, deduplicación por ruta y apertura de varios
   archivos desde sistema y CLI.
-- [ ] Documentar la barra completa: encabezados H1–H6 y párrafo, negrita,
+- [x] Documentar la barra completa: encabezados H1–H6 y párrafo, negrita,
   cursiva, tachado, subrayado, superíndice, subíndice, código, cita, listas,
   tareas, bloque de código, enlace Markdown, enlace interno y tablas.
-- [ ] Documentar el editor visual de tablas, alineación, cambio de eje, filas y
+- [x] Documentar el editor visual de tablas, alineación, cambio de eje, filas y
   columnas, y pegado/copiado tabular cuando corresponda al comportamiento real.
-- [ ] Documentar Mermaid offline, motores incluidos, errores visibles y qué
+- [x] Documentar Mermaid offline, motores incluidos, errores visibles y qué
   sintaxis no interpreta Luca.
-- [ ] Documentar rutas relativas de imágenes y medios, sincronización de scroll,
+- [x] Documentar rutas relativas de imágenes y medios, sincronización de scroll,
   cambios externos, guardado atómico y confirmación antes de descartar.
-- [ ] Documentar claro/oscuro, tipografías, tokens de diseño, importación,
+- [x] Documentar claro/oscuro, tipografías, tokens de diseño, importación,
   exportación y restauración de valores.
-- [ ] Documentar diferencias entre paquete instalable y AppImage portátil,
+- [x] Documentar diferencias entre paquete instalable y AppImage portátil,
   incluida la integración del icono y asociaciones en Linux.
-- [ ] Añadir capturas actuales y texto alternativo útil.
+- [x] Añadir capturas actuales y texto alternativo útil.
 - [ ] Mantener una sección de cambios por release y enlazar las funciones a sus
   issues o specs cuando ayude a verificarlas.
 
@@ -109,42 +109,42 @@ funciones sin obligar a descubrirlas por accidente.
 
 El formato pertenece a cada documento, no a toda la aplicación.
 
-- [ ] Añadir una barra de estado compacta al pie del editor.
-- [ ] Mostrar a la derecha el formato supuesto: **Markdown** o **Wikitext**.
-- [ ] Al pulsarlo, desplegar:
+- [x] Añadir una barra de estado compacta al pie del editor.
+- [x] Mostrar a la derecha el formato supuesto: **Markdown** o **Wikitext**.
+- [x] Al pulsarlo, desplegar:
   - Automático por extensión;
   - Markdown;
   - Wikitext.
-- [ ] Inferir `.md` y `.markdown` como Markdown.
-- [ ] Inferir `.wiki` y `.wikitext` como Wikitext.
-- [ ] Usar la preferencia global sólo como formato inicial de documentos nuevos.
-- [ ] Permitir Markdown y Wikitext simultáneamente en pestañas distintas.
-- [ ] Guardar el override por ruta en el estado local de Luca, nunca dentro del
+- [x] Inferir `.md` y `.markdown` como Markdown.
+- [x] Inferir `.wiki` y `.wikitext` como Wikitext.
+- [x] Usar la preferencia global sólo como formato inicial de documentos nuevos.
+- [x] Permitir Markdown y Wikitext simultáneamente en pestañas distintas.
+- [x] Guardar el override por ruta en el estado local de Luca, nunca dentro del
   archivo.
-- [ ] En documentos sin ruta, mantener el override en la pestaña y asociarlo al
+- [x] En documentos sin ruta, mantener el override en la pestaña y asociarlo al
   guardar.
-- [ ] En modo automático, volver a inferir tras un cambio de extensión; con
+- [x] En modo automático, volver a inferir tras un cambio de extensión; con
   override, conservar la elección explícita.
-- [ ] Avisar discretamente cuando formato y extensión discrepen, sin impedir el
+- [x] Avisar discretamente cuando formato y extensión discrepen, sin impedir el
   guardado.
-- [ ] Cambiar el formato sólo altera interpretación, resaltado, comandos y vista
+- [x] Cambiar el formato sólo altera interpretación, resaltado, comandos y vista
   previa: **no convierte ni reescribe el contenido**.
 
 ### Primer corte: edición fuente Wikitext
 
-- [ ] Especificar inferencia, override, persistencia y preservación byte-fiel en
+- [x] Especificar inferencia, override, persistencia y preservación byte-fiel en
   Allium antes de implementar.
-- [ ] Reutilizar o adaptar una gramática mantenida para CodeMirror 6; evaluar
+- [x] Reutilizar o adaptar una gramática mantenida para CodeMirror 6; evaluar
   primero el trabajo oficial de MediaWiki y su compatibilidad/licencia.
-- [ ] Resaltar títulos, énfasis, listas, enlaces internos y externos, plantillas,
+- [x] Resaltar títulos, énfasis, listas, enlaces internos y externos, plantillas,
   parámetros, comentarios, tablas, etiquetas y referencias.
-- [ ] Ajustar la barra de herramientas al formato activo: no insertar sintaxis
+- [x] Ajustar la barra de herramientas al formato activo: no insertar sintaxis
   Markdown en un documento Wikitext.
-- [ ] Añadir asociaciones de archivo, filtros de apertura/guardado, MIME e iconos
+- [x] Añadir asociaciones de archivo, filtros de apertura/guardado, MIME e iconos
   para `.wiki` y `.wikitext` en todos los instaladores.
 - [ ] Añadir fixtures reales y pruebas que demuestren que abrir y guardar Wikitext
   no altera bytes, saltos de línea ni sintaxis desconocida.
-- [ ] Actualizar README, guía de uso, ayuda, Acerca de y metadatos: Luca dejará de
+- [x] Actualizar README, guía de uso, ayuda, Acerca de y metadatos: Luca dejará de
   describirse como exclusivamente Markdown.
 
 Referencia primaria: [CodeMirror de MediaWiki](https://www.mediawiki.org/wiki/Extension:CodeMirror).
@@ -155,19 +155,19 @@ Wikitext no tiene una previsualización universal: plantillas, funciones,
 extensiones, espacios de nombres y estilos pertenecen a una instalación
 MediaWiki. Luca no construirá un parser aproximado que finja equivalencia.
 
-- [ ] Permitir configurar una wiki de previsualización; Casiopea será la primera.
-- [ ] Enviar texto y contexto de título a la API oficial `action=parse`.
-- [ ] Sanear estrictamente el HTML antes de insertarlo en el WebView.
-- [ ] Resolver recursos y enlaces respecto de la wiki configurada.
-- [ ] Abrir enlaces web en el navegador; definir explícitamente el comportamiento
+- [x] Permitir configurar una wiki de previsualización; Casiopea será la primera.
+- [x] Enviar texto y contexto de título a la API oficial `action=parse`.
+- [x] Sanear estrictamente el HTML antes de insertarlo en el WebView.
+- [x] Resolver recursos y enlaces respecto de la wiki configurada.
+- [x] Abrir enlaces web en el navegador; definir explícitamente el comportamiento
   de enlaces internos de la wiki.
-- [ ] Mostrar estado inequívoco: wiki usada, actualizando, sin conexión, respuesta
+- [x] Mostrar estado inequívoco: wiki usada, actualizando, sin conexión, respuesta
   en caché o error.
-- [ ] Mantener edición fuente completa sin conexión.
-- [ ] No presentar una respuesta en caché como si fuera actual.
-- [ ] Definir límites, cancelación y debounce para no enviar el documento en cada
+- [x] Mantener edición fuente completa sin conexión.
+- [x] No presentar una respuesta en caché como si fuera actual.
+- [x] Definir límites, cancelación y debounce para no enviar el documento en cada
   pulsación.
-- [ ] Tratar autenticación y cookies como una capacidad posterior y explícita;
+- [x] Tratar autenticación y cookies como una capacidad posterior y explícita;
   no reutilizar sesiones del navegador silenciosamente.
 
 Referencia primaria: [API de parsing de Wikitext](https://www.mediawiki.org/wiki/API:Parsing_wikitext).
@@ -183,15 +183,15 @@ Referencia primaria: [Parsoid](https://www.mediawiki.org/wiki/Parsoid).
 
 ## Hito 3 — fluidez editorial
 
-- [ ] Ayuda de atajos consultable desde la aplicación.
-- [ ] Paleta de comandos con búsqueda por nombre y atajo.
-- [ ] Buscar y reemplazar, seleccionar todas las apariciones e ir a línea.
-- [ ] Esquema lateral de encabezados para navegar documentos largos.
-- [ ] Barra de estado sobria: línea, columna, codificación, fin de línea y formato.
-- [ ] Archivos recientes y restauración de pestañas entre sesiones.
-- [ ] Recuperación de borradores tras cierre inesperado, sin sustituir archivos.
-- [ ] Indicadores claros de guardado, cambio externo y conflicto.
-- [ ] Mejorar el resaltado semántico de Markdown y Wikitext con contraste
+- [x] Ayuda de atajos consultable desde la aplicación.
+- [x] Paleta de comandos con búsqueda por nombre y atajo.
+- [x] Buscar y reemplazar, seleccionar todas las apariciones e ir a línea.
+- [x] Esquema lateral de encabezados para navegar documentos largos.
+- [x] Barra de estado sobria: línea, columna, codificación, fin de línea y formato.
+- [x] Archivos recientes y restauración de pestañas entre sesiones.
+- [x] Recuperación de borradores tras cierre inesperado, sin sustituir archivos.
+- [x] Indicadores claros de guardado, cambio externo y conflicto.
+- [x] Mejorar el resaltado semántico de Markdown y Wikitext con contraste
   comprobado, sin convertir el editor en un arcoíris de IDE.
 - [ ] Probar navegación completa por teclado, foco visible, lector de pantalla,
   zoom y movimiento reducido.
@@ -201,29 +201,29 @@ Referencia primaria: [Parsoid](https://www.mediawiki.org/wiki/Parsoid).
 La ventana única sigue siendo el comportamiento normal; nuevas ventanas son una
 acción explícita.
 
-- [ ] `⌘⇧N` / `Ctrl+Shift+N`: nueva ventana.
-- [ ] Arrastrar una pestaña fuera crea una ventana.
-- [ ] Arrastrar sobre otra ventana reúne la pestaña.
-- [ ] Menú **Ventana → Reunir todas las ventanas**.
-- [ ] Mover pestañas entre ventanas también mediante teclado y menú.
-- [ ] Mantener un registro global con un único dueño por documento.
-- [ ] Transferir sin pérdida texto sin guardar, historial de deshacer, selección,
+- [x] `⌘⇧N` / `Ctrl+Shift+N`: nueva ventana.
+- [x] Arrastrar una pestaña fuera crea una ventana.
+- [x] Arrastrar sobre otra ventana reúne la pestaña.
+- [x] Menú **Ventana → Reunir todas las ventanas**.
+- [x] Mover pestañas entre ventanas también mediante teclado y menú.
+- [x] Mantener un registro global con un único dueño por documento.
+- [x] Transferir sin pérdida texto sin guardar, historial de deshacer, selección,
   cursores múltiples, scroll, formato supuesto/override y modo de vista.
-- [ ] Resolver qué ocurre al cerrar una ventana con documentos sucios.
-- [ ] No iniciar implementación hasta especificar propiedad, transferencia y
+- [x] Resolver qué ocurre al cerrar una ventana con documentos sucios.
+- [x] No iniciar implementación hasta especificar propiedad, transferencia y
   recuperación ante fallo.
 
 ## Hito 5 — confianza y v1.0
 
 - [ ] Matriz automatizada y manual en macOS Apple Silicon/Intel, Windows y Linux.
 - [ ] Instaladores firmados/notarizados y actualizaciones verificables.
-- [ ] Política de migración para preferencias y estado local.
+- [x] Política de migración para preferencias y estado local.
 - [ ] Pruebas de accesibilidad y regresión visual esenciales.
-- [ ] Diagnóstico exportable sin incluir documentos, credenciales ni rutas
+- [x] Diagnóstico exportable sin incluir documentos, credenciales ni rutas
   sensibles.
-- [ ] Política de privacidad y conectividad que distinga recursos locales,
+- [x] Política de privacidad y conectividad que distinga recursos locales,
   actualización, CDN y previsualización MediaWiki.
-- [ ] Documentación de recuperación, desinstalación y ubicación de datos.
+- [x] Documentación de recuperación, desinstalación y ubicación de datos.
 
 ## Optimización, seguridad y limpieza
 
@@ -235,12 +235,12 @@ aplicación con una interfaz nativa y perder el fundamento técnico actual. Lo q
 sí debe eliminarse es el comportamiento de navegador:
 
 - [x] los enlaces web se delegan al navegador predeterminado;
-- [ ] bloquear también a nivel nativo cualquier navegación no autorizada de la
+- [x] bloquear también a nivel nativo cualquier navegación no autorizada de la
   ventana principal, aunque un manejador de la interfaz falle;
-- [ ] auditar todos los lugares que producen enlaces: preview, Acerca de,
+- [x] auditar todos los lugares que producen enlaces: preview, Acerca de,
   Mermaid y futura vista Wikitext;
-- [ ] conservar anclas internas sólo cuando pertenecen al documento actual;
-- [ ] añadir pruebas que demuestren que ninguna URL sustituye la interfaz.
+- [x] conservar anclas internas sólo cuando pertenecen al documento actual;
+- [x] añadir pruebas que demuestren que ninguna URL sustituye la interfaz.
 
 ### Carga y tamaño
 
@@ -249,45 +249,45 @@ concentran la mayor parte.
 
 - [ ] Medir tamaño instalado, tiempo de arranque, memoria con 1/10/50 pestañas y
   latencia de escritura antes de optimizar.
-- [ ] Cargar Marked y Mermaid sólo cuando la vista previa se usa.
-- [ ] Cargar Mermaid y cada motor de layout sólo cuando el documento contiene un
+- [x] Cargar Marked y Mermaid sólo cuando la vista previa se usa.
+- [x] Cargar Mermaid y cada motor de layout sólo cuando el documento contiene un
   diagrama que lo necesita.
-- [ ] Evaluar si ELK, tidy-tree y ZenUML deben distribuirse siempre o como módulos
+- [x] Evaluar si ELK, tidy-tree y ZenUML deben distribuirse siempre o como módulos
   opcionales; preservar Mermaid offline como contrato.
 - [ ] Evitar rerenderizar el documento completo cuando una actualización por
   bloques sea correcta y mediblemente mejor.
-- [ ] Cancelar renders obsoletos en vez de dejarlos terminar.
+- [x] Cancelar renders obsoletos en vez de dejarlos terminar.
 - [ ] Medir antes de virtualizar editores o previews inactivos; no sacrificar
   historial, cursor ni scroll por ahorrar memoria teórica.
-- [ ] Comprimir/optimizar el icono que se copia al runtime sin crear otra fuente
+- [x] Comprimir/optimizar el icono que se copia al runtime sin crear otra fuente
   maestra.
 
 ### Offline, red y superficie de permisos
 
-- [ ] Eliminar el respaldo CDN si los recursos vendor locales cubren todas las
+- [x] Eliminar el respaldo CDN si los recursos vendor locales cubren todas las
   rutas; entonces retirar `cdn.jsdelivr.net` de CSP y `connect-src`.
-- [ ] Si se conserva un fallback de red, hacerlo explícito en Preferencias y en la
-  documentación, desactivado por defecto.
-- [ ] Restringir `assetProtocol.scope`, actualmente `**`, a las rutas mínimas que
+- [x] Si se conserva un fallback de red, hacerlo explícito en Preferencias y en la
+  documentación, desactivado por defecto. No se conserva ningún fallback.
+- [x] Restringir `assetProtocol.scope`, actualmente `**`, a las rutas mínimas que
   necesitan los documentos abiertos.
-- [ ] Reducir permisos de opener a protocolos y destinos necesarios.
-- [ ] Revisar `dangerousDisableAssetCspModification` y `unsafe-inline`; retirar
+- [x] Reducir permisos de opener a protocolos y destinos necesarios.
+- [x] Revisar `dangerousDisableAssetCspModification` y `unsafe-inline`; retirar
   excepciones que ya no sean necesarias.
-- [ ] Sanear HTML Markdown y Wikitext sin romper contenido legítimo ni permitir
+- [x] Sanear HTML Markdown y Wikitext sin romper contenido legítimo ni permitir
   que un archivo local ejecute interfaz o scripts privilegiados.
-- [ ] Separar en la UI y la política de red: actualizaciones, recursos opcionales
+- [x] Separar en la UI y la política de red: actualizaciones, recursos opcionales
   y previsualización mediante MediaWiki.
 
 ### Reproducibilidad y repositorio
 
-- [ ] Versionar `package-lock.json` y usar `npm ci` en CI para builds
+- [x] Versionar `package-lock.json` y usar `npm ci` en CI para builds
   reproducibles.
 - [ ] Auditar dependencias npm y Cargo por uso real, licencia, tamaño y
   mantenimiento antes de añadir nuevas.
-- [ ] Confirmar que el antiguo árbol Swift `.build/` no es fuente ni artefacto de
+- [x] Confirmar que el antiguo árbol Swift `.build/` no es fuente ni artefacto de
   distribución; después retirarlo del repositorio en un cambio explícito y
   recuperable, nunca como limpieza lateral.
-- [ ] Mantener `ui/vendor/`, `node_modules/` y `src-tauri/target/` como generados.
+- [x] Mantener `ui/vendor/`, `node_modules/` y `src-tauri/target/` como generados.
 - [ ] Hacer que CI verifique versiones sincronizadas, contenido de paquetes,
   asociaciones, iconos, specs, pruebas y build de cada plataforma antes de una
   release.

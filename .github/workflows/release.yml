@@ -55,6 +55,12 @@ jobs:
       - name: Verificar comportamiento y empaquetado
         run: npm test
 
+      - name: Verificar formato Rust
+        run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+
+      - name: Verificar compilación nativa
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

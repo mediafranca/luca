@@ -12,6 +12,7 @@ import { recentPaths, sessionSnapshot, validSession } from "./session-state.js";
 import { matchingCommands } from "./command-search.js";
 import { detectedLineEnding, documentHeadings } from "./document-outline.js";
 import { diagnosticReport, migrateSettings } from "./settings-state.js";
+import { isDisposableBlank, transferableTab } from "./window-transfer.js";
 
 try { migrateSettings(localStorage); } catch {}
 
@@ -310,7 +311,15 @@ async function renderDoc(doc, force = false) {
       if (!rawSrc) continue;
       if (/^([a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)/i.test(rawSrc.trim())) continue;
       const absPath = resolveDocPath(docDir, rawSrc);
-      el.src = toAssetUrl(absPath);
+      try {
+        const allowedPath = TAURI
+          ? await TAURI.core.invoke("allow_preview_asset", { path: absPath })
+          : absPath;
+        el.src = toAssetUrl(allowedPath);
+      } catch {
+        el.removeAttribute("src");
+        el.title = "Recurso local no disponible o no permitido";
+      }
     }
   }
 
@@ -599,23 +608,10 @@ function closeDoc(doc, { force = false, release = true, replacement = true } = {
   return true;
 }
 
-function transferableTab(doc) {
-  return {
-    path: doc.path,
-    dirty: doc.dirty,
-    lastMtime: doc.lastMtime,
-    formatSelection: doc.formatSelection,
-    lineEnding: doc.lineEnding,
-    editorState: doc.ed.serialize(),
-    scroll: doc.ed.getScroll(),
-    mode: document.body.dataset.mode,
-  };
-}
-
 async function moveTabToWindow(doc, target = null) {
   if (!TAURI || !doc) return;
   const targetLabel = target || await TAURI.core.invoke("create_editor_window");
-  await TAURI.core.invoke("transfer_tab", { target: targetLabel, payload: transferableTab(doc) });
+  await TAURI.core.invoke("transfer_tab", { target: targetLabel, payload: transferableTab(doc, document.body.dataset.mode) });
   closeDoc(doc, { force: true, release: false, replacement: false });
   if (docs.length === 0) await TAURI.window.getCurrentWindow().close();
 }
@@ -623,7 +619,7 @@ async function moveTabToWindow(doc, target = null) {
 async function receiveTransferredTabs() {
   if (!TAURI) return;
   const incoming = await TAURI.core.invoke("take_transferred_tabs", { windowLabel });
-  if (incoming.length && docs.length === 1 && !docs[0].path && !docs[0].dirty && docs[0].ed.getDoc() === "") {
+  if (incoming.length && docs.length === 1 && isDisposableBlank(docs[0])) {
     closeDoc(docs[0], { force: true, replacement: false });
   }
   for (const payload of incoming) {

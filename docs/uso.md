@@ -59,6 +59,15 @@ instantánea nunca sobrescribe el archivo. Los borradores de más de 2 millones 
 caracteres no se duplican en el almacenamiento del WebView. Cerrar la ventana
 con cambios pendientes pide confirmación.
 
+### Varias ventanas
+
+`⌘⇧N` / `Ctrl+Shift+N` crea una ventana. **Ventana → Mover pestaña a nueva
+ventana** (`⌘⇧M` / `Ctrl+Shift+M`) y arrastrar fuera de la barra separan una
+pestaña; **Reunir todas las ventanas** las mueve a la ventana actual. La
+transferencia conserva texto sucio, historial, selección y cursores múltiples,
+scroll, formato y modo de vista. Una ruta tiene un único dueño: abrirla desde
+otra ventana enfoca la que ya la contiene.
+
 ## Modos de trabajo
 
 - **Código** (`⌘1` / `Ctrl+1`) muestra sólo el editor Markdown.
@@ -186,6 +195,10 @@ Desde Preferencias puedes elegir el tema de Mermaid, restaurar los valores
 predeterminados y exportar o importar todos los tokens como JSON. La importación
 reemplaza los valores configurables por los del archivo elegido; conserva una
 copia del JSON si quieres poder volver a una configuración anterior.
+
+**Exportar diagnóstico…** guarda información técnica y conteos de pestañas sin
+texto, nombres o rutas de documentos, recientes, credenciales o dirección de la
+wiki. Consulta la [política de privacidad y conectividad](privacidad.md).
 
 ## Paquetes en Linux
 
