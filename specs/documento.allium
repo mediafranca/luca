@@ -185,3 +185,20 @@ rule CerrarDocumento {
         -- Si se cierra el documento activo, queda activo uno de los restantes;
         -- siempre hay exactamente un documento activo (UnSoloActivo).
 }
+
+------------------------------------------------------------
+-- Reordenar pestañas
+------------------------------------------------------------
+
+rule ReordenarPestana {
+    -- El Autor mueve una pestaña junto a otra. Cambia únicamente el orden
+    -- visible: el documento conserva ruta, contenido, estado de guardado,
+    -- historial, cursor y desplazamiento.
+    when: AutorReordenaPestana(documento, junto_a, lado)
+
+    requires: documento in espacio.documentos
+    requires: junto_a in espacio.documentos
+    requires: documento != junto_a
+
+    ensures: PestanasReordenadas(documento: documento, junto_a: junto_a, lado: lado)
+}

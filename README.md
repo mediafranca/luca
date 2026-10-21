@@ -37,11 +37,26 @@ xattr -cr /Applications/Luca.app
 - Diagramas Mermaid, sin conexión.
 - Varios documentos en pestañas. Guardado seguro y aviso si otro programa
   cambió el archivo.
+- Una sola instancia visible: abrir más archivos los reúne en pestañas de la
+  ventana existente. Las pestañas se pueden arrastrar y reordenar.
+- Multiselección con ⌘D / Ctrl+D para añadir la siguiente aparición, disponible
+  también en el menú Edición.
 - Exportar a PDF.
 - Exportar e importar los tokens de diseño como JSON desde Preferencias.
 - Tipografía y colores configurables (`⌘,`), claro y oscuro.
 
 ![Luca](./assets/luca-screenshot.png)
+
+## Línea de comandos
+
+La instalación registra el comando Luca:
+
+    luca pagina.md notas.md
+    luca --new
+    luca --help
+    luca --version
+
+Si Luca ya está abierto, los archivos se entregan a esa ventana.
 
 ## Desde el código
 
@@ -59,10 +74,14 @@ cargo tauri dev
 
 Contribuciones: ver [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Nombre
+## Acerca de Luca
 
 Por Luca Pacioli, que en *Divina proportione* (1509) estudió la construcción
 geométrica de las letras. El ícono es su «L».
+
+Luca es una iniciativa de **MediaFranca**, creada por **Herbert Spencer**.
+Su procedencia y ficha de obra se documentan también en
+[Casiopea](https://wiki.ead.pucv.cl/Luca).
 
 ## Vera
 

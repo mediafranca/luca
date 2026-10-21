@@ -1,17 +1,21 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::ffi::OsString;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
-// Sólo Windows y Linux reciben el archivo como argumento; en macOS el módulo
-// se compila únicamente para sus pruebas.
-#[cfg(any(target_os = "windows", target_os = "linux", test))]
+// Analiza tanto aperturas iniciales como argumentos reenviados por la segunda
+// instancia. macOS además entrega asociaciones mediante RunEvent::Opened.
 mod file_argument;
 
-// Archivo pendiente de apertura en frío (Finder / "Abrir con…" de Vera lanzan
-// la app antes de que el frontend registre el listener).
-struct Pending(Mutex<Option<String>>);
+// Aperturas pendientes en frío: el sistema puede entregar varios archivos
+// antes de que el frontend registre los listeners.
+struct Pending {
+    files: Mutex<Vec<String>>,
+    new_document: AtomicBool,
+}
 
 // I/O byte-fiel: el archivo se guarda tal cual lo escribió el usuario.
 #[tauri::command]
@@ -46,8 +50,13 @@ fn mtime_ms(path: &str) -> Result<u64, String> {
 }
 
 #[tauri::command]
-fn take_opened_file(state: tauri::State<Pending>) -> Option<String> {
-    state.0.lock().unwrap().take()
+fn take_opened_files(state: tauri::State<Pending>) -> Vec<String> {
+    std::mem::take(&mut *state.files.lock().unwrap())
+}
+
+#[tauri::command]
+fn take_new_document(state: tauri::State<Pending>) -> bool {
+    state.new_document.swap(false, Ordering::SeqCst)
 }
 
 // Exportar a PDF. En macOS Tauri sustituye `window.print()` por una impresión
@@ -96,10 +105,15 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         b.build(app)
     };
 
-    let prefs_mermaid = item("prefs_mermaid", "Configuración de diseño…", Some("CmdOrCtrl+,"))?;
+    let prefs_mermaid = item(
+        "prefs_mermaid",
+        "Configuración de diseño…",
+        Some("CmdOrCtrl+,"),
+    )?;
+    let about = item("about", "Acerca de Luca", None)?;
 
     let app_menu = SubmenuBuilder::new(app, "Luca")
-        .about(None)
+        .item(&about)
         .separator()
         .item(&prefs_mermaid)
         .separator()
@@ -117,7 +131,11 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .item(&item("open", "Abrir…", Some("CmdOrCtrl+O"))?)
         .separator()
         .item(&item("save", "Guardar", Some("CmdOrCtrl+S"))?)
-        .item(&item("save_as", "Guardar como…", Some("CmdOrCtrl+Shift+S"))?)
+        .item(&item(
+            "save_as",
+            "Guardar como…",
+            Some("CmdOrCtrl+Shift+S"),
+        )?)
         .separator()
         .item(&item("export_pdf", "Exportar (PDF)…", Some("CmdOrCtrl+E"))?)
         .separator()
@@ -130,6 +148,12 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .undo()
         .redo()
         .separator()
+        .item(&item(
+            "select_next_occurrence",
+            "Seleccionar siguiente aparición",
+            Some("CmdOrCtrl+D"),
+        )?)
+        .separator()
         .cut()
         .copy()
         .paste()
@@ -137,14 +161,35 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
 
     let vista = SubmenuBuilder::new(app, "Vista")
-        .item(&item("mode_source", "Código Markdown", Some("CmdOrCtrl+1"))?)
+        .item(&item(
+            "mode_source",
+            "Código Markdown",
+            Some("CmdOrCtrl+1"),
+        )?)
         .item(&item("mode_split", "Vista dividida", Some("CmdOrCtrl+2"))?)
-        .item(&item("mode_rendered", "Texto renderizado", Some("CmdOrCtrl+3"))?)
+        .item(&item(
+            "mode_rendered",
+            "Texto renderizado",
+            Some("CmdOrCtrl+3"),
+        )?)
         .separator()
         .item(&item("zen", "Modo zen", Some("CmdOrCtrl+Shift+Z"))?)
         .build()?;
 
-    let ventana = SubmenuBuilder::new(app, "Ventana").minimize().build()?;
+    let ventana = SubmenuBuilder::new(app, "Ventana")
+        .item(&item(
+            "move_tab_left",
+            "Mover pestaña a la izquierda",
+            Some("Alt+Shift+Left"),
+        )?)
+        .item(&item(
+            "move_tab_right",
+            "Mover pestaña a la derecha",
+            Some("Alt+Shift+Right"),
+        )?)
+        .separator()
+        .minimize()
+        .build()?;
 
     let menu = MenuBuilder::new(app)
         .items(&[&app_menu, &archivo, &edicion, &vista, &ventana])
@@ -154,16 +199,59 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn main() {
+    let startup_args: Vec<OsString> = std::env::args_os().collect();
+    match file_argument::requested_information(startup_args.clone()) {
+        Some("help") => {
+            println!(
+                "Luca {}\n\nUso: luca [--new] [--] [archivo.md …]\n\n  --new          crea una pestaña vacía\n  -h, --help     muestra esta ayuda\n  -V, --version  muestra la versión",
+                env!("CARGO_PKG_VERSION")
+            );
+            return;
+        }
+        Some("version") => {
+            println!("Luca {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+        _ => {}
+    }
+    let startup_cwd = std::env::current_dir().unwrap_or_default();
+    let startup_request = file_argument::parse_launch_arguments(startup_args, &startup_cwd);
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            let request = file_argument::parse_launch_arguments(args, std::path::Path::new(&cwd));
+            if let Some(pending) = app.try_state::<Pending>() {
+                pending.files.lock().unwrap().extend(request.files);
+                if request.new_document {
+                    pending.new_document.store(true, Ordering::SeqCst);
+                }
+            }
+            let _ = app.emit("launch-request", ());
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(Pending(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![read_file, write_file, stat, take_opened_file, print_with_margins])
-        .setup(|app| {
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
-            if let Some(path) = file_argument::first_local_file_argument(std::env::args_os()) {
-                *app.state::<Pending>().0.lock().unwrap() = Some(path);
-            }
+        .manage(Pending {
+            files: Mutex::new(Vec::new()),
+            new_document: AtomicBool::new(false),
+        })
+        .invoke_handler(tauri::generate_handler![
+            read_file,
+            write_file,
+            stat,
+            take_opened_files,
+            take_new_document,
+            print_with_margins
+        ])
+        .setup(move |app| {
+            *app.state::<Pending>().files.lock().unwrap() = startup_request.files.clone();
+            app.state::<Pending>()
+                .new_document
+                .store(startup_request.new_document, Ordering::SeqCst);
             build_menu(app)?;
             Ok(())
         })
@@ -179,14 +267,22 @@ fn main() {
             #[cfg(target_os = "macos")]
             {
                 if let tauri::RunEvent::Opened { urls } = event {
-                    if let Some(path) = urls
+                    let paths = urls
                         .iter()
-                        .find_map(|u| u.to_file_path().ok())
+                        .filter_map(|u| u.to_file_path().ok())
                         .map(|p| p.to_string_lossy().into_owned())
-                    {
-                        *app.state::<Pending>().0.lock().unwrap() = Some(path.clone());
+                        .collect::<Vec<_>>();
+                    if !paths.is_empty() {
+                        app.state::<Pending>()
+                            .files
+                            .lock()
+                            .unwrap()
+                            .extend(paths.clone());
+                        let _ = app.emit("launch-request", ());
                         if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.emit("open-file", path);
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
                         }
                     }
                 }

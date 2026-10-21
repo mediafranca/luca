@@ -1,0 +1,11 @@
+[Desktop Entry]
+Categories={{categories}}
+Comment={{comment}}
+Exec={{exec}} %F
+StartupWMClass=luca
+Icon={{icon}}
+Name={{name}}
+Terminal=false
+Type=Application
+MimeType=text/markdown;
+Keywords=Markdown;Editor;Texto;Escritura;

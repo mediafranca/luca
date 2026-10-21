@@ -7,6 +7,7 @@ import { createEditorToolbar, editDocumentTableAtIndex } from "./toolbar.js";
 import { icon } from "./icons.js";
 import { beginBlockEdit, exitBlockEdit } from "./block-edit.js";
 import { externalWebUrl, isEditablePreviewMode, isInternalAnchor } from "./preview-behavior.js";
+import { moveByOffset, reorderById } from "./tab-order.js";
 
 const LOCAL = "./vendor";
 const CDN = "https://cdn.jsdelivr.net/npm";
@@ -98,6 +99,7 @@ const docs = [];     // documentos abiertos
 let active = null;   // documento activo
 let seq = 0;         // ids de mermaid, únicos entre TODOS los documentos
 let nextId = 1;
+let draggedTabId = null;
 
 // Una sola barra de herramientas, en la barra superior; opera sobre el
 // documento activo (el getter resuelve `doc.ed` en cada clic).
@@ -234,6 +236,10 @@ function renderTabs() {
   tabsEl.replaceChildren(...docs.map((doc) => {
     const tab = document.createElement("div");
     tab.className = "tab" + (doc === active ? " active" : "");
+    tab.role = "tab";
+    tab.tabIndex = doc === active ? 0 : -1;
+    tab.ariaSelected = doc === active ? "true" : "false";
+    tab.draggable = true;
     tab.title = doc.path ?? "sin guardar";
     const label = document.createElement("span");
     label.className = "label";
@@ -248,8 +254,55 @@ function renderTabs() {
     close.addEventListener("click", (e) => { e.stopPropagation(); closeDoc(doc); });
     tab.append(label, close);
     tab.addEventListener("mousedown", () => activate(doc));
+    tab.addEventListener("keydown", (e) => {
+      if (e.altKey && e.shiftKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        moveTab(doc, -1);
+      } else if (e.altKey && e.shiftKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        moveTab(doc, 1);
+      }
+    });
+    tab.addEventListener("dragstart", (e) => {
+      draggedTabId = doc.id;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(doc.id));
+      tab.classList.add("dragging");
+    });
+    tab.addEventListener("dragover", (e) => {
+      if (draggedTabId === null || draggedTabId === doc.id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      tab.classList.add("drop-target");
+    });
+    tab.addEventListener("dragleave", () => tab.classList.remove("drop-target"));
+    tab.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const rect = tab.getBoundingClientRect();
+      const placement = e.clientX >= rect.left + rect.width / 2 ? "after" : "before";
+      reorderTab(draggedTabId, doc.id, placement);
+      draggedTabId = null;
+    });
+    tab.addEventListener("dragend", () => {
+      draggedTabId = null;
+      tab.classList.remove("dragging", "drop-target");
+    });
     return tab;
   }));
+}
+
+function replaceTabOrder(next) {
+  docs.splice(0, docs.length, ...next);
+  renderTabs();
+  tabsEl.querySelector('[aria-selected="true"]')?.focus();
+}
+
+function reorderTab(movedId, targetId, placement) {
+  replaceTabOrder(reorderById(docs, movedId, targetId, placement));
+}
+
+function moveTab(doc, offset) {
+  replaceTabOrder(moveByOffset(docs, doc.id, offset));
 }
 
 function activate(doc) {
@@ -371,6 +424,7 @@ addEventListener(
 
 if (TAURI) {
   TAURI.event.listen("open-file", (e) => openPath(e.payload)); // apertura en caliente: añade pestaña
+  TAURI.event.listen("launch-request", () => drainLaunchRequest());
   TAURI.event.listen("menu", (e) => {
     const id = e.payload, a = active;
     if (id === "new") newDoc();
@@ -384,6 +438,10 @@ if (TAURI) {
     else if (id === "mode_split") applyMode("split");
     else if (id === "mode_rendered") applyMode("rendered");
     else if (id === "zen") toggleZen();
+    else if (id === "move_tab_left") { if (a) moveTab(a, -1); }
+    else if (id === "move_tab_right") { if (a) moveTab(a, 1); }
+    else if (id === "about") openAbout();
+    else if (id === "select_next_occurrence") { a?.ed.selectNextOccurrence(); }
   });
 }
 
@@ -769,6 +827,7 @@ ${darkCSS}
 }
 
 const prefsEl = document.getElementById("prefs");
+const aboutEl = document.getElementById("about");
 const mermaidSel = document.getElementById("mermaidTheme");
 const tokenFormGeneral = document.getElementById("tokenFormGeneral");
 const tokenFormLight = document.getElementById("tokenFormLight");
@@ -928,6 +987,29 @@ function closePrefs() {
   if (prefsEl) prefsEl.hidden = true;
 }
 
+async function openAbout() {
+  if (!aboutEl) return;
+  try {
+    const version = await TAURI?.app?.getVersion?.();
+    if (version) document.getElementById("aboutVersion").textContent = `versión ${version}`;
+  } catch {}
+  aboutEl.hidden = false;
+  document.getElementById("aboutClose")?.focus();
+}
+
+function closeAbout() {
+  if (aboutEl) aboutEl.hidden = true;
+}
+
+document.getElementById("aboutClose")?.addEventListener("click", closeAbout);
+aboutEl?.addEventListener("click", (e) => { if (e.target === aboutEl) closeAbout(); });
+aboutEl?.querySelectorAll("[data-external]").forEach((link) => {
+  link.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try { await TAURI?.opener?.openUrl?.(link.href); } catch {}
+  });
+});
+
 function resetTokens() {
   tokensState = {
     general: { ...VERA_DEFAULTS.general },
@@ -1009,6 +1091,12 @@ addEventListener("keydown", (e) => {
       e.preventDefault();
       e.stopPropagation();
       closePrefs();
+      return;
+    }
+    if (aboutEl && !aboutEl.hidden) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeAbout();
       return;
     }
     if (document.body.dataset.zen === "on") {
@@ -1102,6 +1190,13 @@ initMermaid();
 if (document.fonts?.ready) { try { await document.fonts.ready; } catch {} }
 
 // Arranque: si Vera/Finder lanzaron Luca con un archivo, ábrelo; si no, el ejemplo.
-const pending = TAURI ? await TAURI.core.invoke("take_opened_file") : null;
-if (pending) await openPath(pending);
-else makeDoc(SAMPLE, null);
+async function drainLaunchRequest() {
+  if (!TAURI) return false;
+  const pending = await TAURI.core.invoke("take_opened_files");
+  const pendingNew = await TAURI.core.invoke("take_new_document");
+  if (pendingNew) newDoc();
+  for (const path of pending ?? []) await openPath(path);
+  return pendingNew || Boolean(pending?.length);
+}
+
+if (!(await drainLaunchRequest())) makeDoc(SAMPLE, null);

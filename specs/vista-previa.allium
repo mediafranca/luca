@@ -34,10 +34,24 @@ surface Editor {
             when d in espacio.documentos
         AutorCierraDocumento(d)
             when d in espacio.documentos
+        AutorReordenaPestana(d, junto_a, lado)
+            when d in espacio.documentos and junto_a in espacio.documentos and d != junto_a
 
     @guarantee AperturaNoReemplaza
         -- Abrir un documento nunca cierra ni reemplaza los ya abiertos; cada
         -- pestaña conserva su ruta y su estado (cursor, scroll, historial).
+
+    @guarantee ReordenarConservaElDocumento
+        -- Arrastrar una pestaña o moverla con el teclado cambia sólo su lugar
+        -- en la barra. No recrea el editor ni pierde borradores, historial,
+        -- cursor, selección o desplazamiento. El orden elegido permanece
+        -- mientras la ventana siga abierta.
+
+    @guarantee IdentidadDeLaObra
+        -- Los menús, el diálogo Acerca de Luca y los instaladores presentan a
+        -- Luca como una iniciativa de MediaFranca creada por Herbert Spencer,
+        -- enlazan Casiopea y GitHub, declaran la licencia EUPL 1.2 y usan la
+        -- letra capital L inspirada en Luca Pacioli como icono de la aplicación.
 }
 
 ------------------------------------------------------------

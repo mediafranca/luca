@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Luca",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "identifier": "net.mediafranca.luca",
   "build": {
     "frontendDist": "../ui",
@@ -30,17 +30,26 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "publisher": "Herbert Spencer González",
-    "homepage": "https://github.com/hspencer",
+    "publisher": "MediaFranca · Herbert Spencer González",
+    "homepage": "https://github.com/mediafranca/luca",
     "copyright": "© 2026 Herbert Spencer González",
     "license": "EUPL-1.2",
+    "category": "Productivity",
+    "shortDescription": "Editor Markdown de escritorio",
+    "longDescription": "Luca es una iniciativa de MediaFranca creada por Herbert Spencer: un editor Markdown local para pensar y escribir con archivos propios.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/icon.png",
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "luca.desktop"
+      }
+    },
     "fileAssociations": [
       {
         "ext": ["md", "markdown"],

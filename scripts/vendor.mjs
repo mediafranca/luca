@@ -15,6 +15,11 @@ if (existsSync(out) && !force) {
   process.exit(0);
 }
 rmSync(out, { recursive: true, force: true });
+mkdirSync(out, { recursive: true });
+
+// El diálogo Acerca de Luca usa la misma fuente maestra que todos los paquetes;
+// no mantenemos otra copia manual del icono dentro del frontend.
+copyFileSync(join(root, "icon.png"), join(out, "luca-icon.png"));
 
 // entry → carpeta destino bajo ui/vendor/
 const nm = join(root, "node_modules");

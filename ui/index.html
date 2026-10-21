@@ -92,6 +92,9 @@
   /* ---- Barra superior (pestañas + modos) ---- */
   #topbar { background:var(--bg-raised); border-bottom:1px solid var(--rule); }
   #tabs { display:flex; align-items:stretch; overflow-x:auto; }
+  .tab[draggable="true"] { cursor:grab; }
+  .tab.dragging { opacity:.45; }
+  .tab.drop-target { box-shadow:inset 3px 0 0 var(--accent); }
   .tab { display:flex; align-items:center; gap:7px; padding:7px 12px; cursor:default;
          white-space:nowrap; max-width:240px; font-family:var(--font-body); font-size:12.5px;
          color:var(--text-dim); border-bottom:2px solid transparent; }
@@ -377,11 +380,26 @@
   .prefs-actions button:hover { border-color:var(--text-dim); }
   .prefs-actions > div { display:flex; gap:8px; flex-wrap:wrap; }
 
+  /* ---- Acerca de Luca ---- */
+  #about { position:fixed; inset:0; z-index:120; display:grid; place-items:center;
+    padding:24px; background:color-mix(in srgb, var(--bg) 42%, transparent); }
+  #about[hidden] { display:none; }
+  .about-panel { width:min(480px, 94vw); padding:30px; border:1px solid var(--rule);
+    border-radius:16px; background:var(--bg-raised); color:var(--text);
+    box-shadow:0 22px 70px rgba(0,0,0,.34); text-align:center;
+    font-family:var(--font-ui, var(--font-body)); }
+  .about-icon { width:112px; height:112px; display:block; margin:0 auto 14px; }
+  .about-panel h2 { margin:0 0 4px; font-size:1.5rem; }
+  .about-version { margin:0 0 18px; color:var(--text-dim); font-size:.86rem; }
+  .about-panel p { margin:10px auto; max-width:39ch; line-height:1.5; }
+  .about-panel a { color:var(--accent); }
+  .about-actions { display:flex; justify-content:center; margin-top:22px; }
+
   /* ---- Impresión / Exportar PDF: sólo la vista previa del documento activo ---- */
   /* Márgenes de página explícitos: el diálogo de impresión del webview parte de cero. */
   @page { margin:20mm 18mm; }
   @media print {
-    #topbar, #editors, #prefs, .table-modal, .preview-edit-table { display:none !important; }
+    #topbar, #editors, #prefs, #about, .table-modal, .preview-edit-table { display:none !important; }
     body { display:block; height:auto; background:#fff; color:#000; }
     #workspace { display:block; }
     #previews { display:block !important; overflow:visible; }
@@ -461,6 +479,18 @@
         </div>
         <button type="button" id="prefsClose">Cerrar</button>
       </div>
+    </div>
+  </div>
+  <div id="about" hidden role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <div class="about-panel">
+      <img class="about-icon" src="vendor/luca-icon.png" alt="Letra capital L de Luca">
+      <h2 id="aboutTitle">Luca</h2>
+      <p id="aboutVersion" class="about-version">versión de desarrollo</p>
+      <p>Un editor Markdown para pensar y escribir con archivos propios.</p>
+      <p><strong>Iniciativa de MediaFranca creada por Herbert Spencer.</strong></p>
+      <p>Su nombre y su letra capital L recuerdan a Luca Pacioli y la construcción geométrica de las letras en <em>Divina proportione</em> (1509).</p>
+      <p><a href="https://wiki.ead.pucv.cl/Luca" data-external>Casiopea</a> · <a href="https://github.com/mediafranca/luca" data-external>GitHub</a> · EUPL 1.2</p>
+      <div class="about-actions"><button type="button" id="aboutClose" class="btn-primary">Cerrar</button></div>
     </div>
   </div>
   <script type="module" src="app.js"></script>

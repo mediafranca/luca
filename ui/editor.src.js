@@ -8,6 +8,7 @@ import { EditorView, basicSetup, minimalSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { selectNextOccurrence } from "@codemirror/search";
 import { tags as t } from "@lezer/highlight";
 
 // Tamaño e interlínea del código salen del token --code-size (Preferencias).
@@ -41,10 +42,12 @@ const highlight = HighlightStyle.define([
   { tag: [t.heading, t.heading1, t.heading2, t.heading3], color: "var(--code-text, var(--text))", fontWeight: "700" },
   { tag: t.strong, fontWeight: "700" },
   { tag: t.emphasis, fontStyle: "italic" },
+  { tag: t.strikethrough, textDecoration: "line-through" },
   { tag: [t.link, t.url], color: "var(--accent)" },
-  { tag: [t.monospace, t.literal], color: "var(--text-dim)" },
+  { tag: [t.monospace, t.literal, t.string], color: "var(--text-dim)" },
   { tag: t.quote, color: "var(--text-dim)", fontStyle: "italic" },
-  { tag: [t.list, t.processingInstruction], color: "var(--accent)" },
+  { tag: [t.list, t.labelName, t.bool, t.contentSeparator], color: "var(--accent)" },
+  { tag: [t.processingInstruction, t.meta, t.punctuation], color: "var(--text-dim)" },
 ]);
 
 // Editor de bloque (vista renderizada): sin numeración ni fondo propio; la
@@ -104,6 +107,10 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
     destroy: () => view.destroy(),
     remeasure: () => view.requestMeasure(),
     focus: () => view.focus(),
+    selectNextOccurrence: () => {
+      selectNextOccurrence(view);
+      view.focus();
+    },
     getView: () => view,
     getSelection: () => {
       const sel = view.state.selection.main;

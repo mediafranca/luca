@@ -52,6 +52,9 @@ jobs:
       # de Tauri ejecuta `npm run vendor` (empaqueta CodeMirror y copia mermaid/marked).
       - run: npm install
 
+      - name: Verificar comportamiento y empaquetado
+        run: npm test
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
