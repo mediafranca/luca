@@ -1,0 +1,20 @@
+-- allium: 3
+-- accesibilidad.allium — acceso equivalente a las superficies de Luca
+
+use "./luca.allium" as luca
+
+surface InterfazAccesible {
+    facing autor: luca/Autor
+
+    @guarantee OperacionPorTeclado
+        -- Pestañas, comandos, preferencias y acciones principales se pueden
+        -- recorrer y activar sin un dispositivo apuntador.
+
+    @guarantee FocoPerceptible
+        -- Todo control enfocado presenta un indicador visible; cerrar una
+        -- superficie modal devuelve el foco al control que la abrió.
+
+    @guarantee SemanticaDeAsistencia
+        -- Pestañas, regiones, diálogos y controles exponen roles y nombres
+        -- que permiten comprender su propósito con tecnología de asistencia.
+}

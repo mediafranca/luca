@@ -190,8 +190,10 @@ Referencia primaria: [Parsoid](https://www.mediawiki.org/wiki/Parsoid).
 - [x] Indicadores claros de guardado, cambio externo y conflicto.
 - [x] Mejorar el resaltado semántico de Markdown y Wikitext con contraste
   comprobado, sin convertir el editor en un arcoíris de IDE.
-- [ ] Probar navegación completa por teclado, foco visible, lector de pantalla,
-  zoom y movimiento reducido.
+- [x] Añadir semántica de pestañas, regiones y diálogos, navegación de pestañas
+  por teclado, foco visible y retorno del foco; cubrirlo con regresión automática.
+- [ ] Probar manualmente la navegación completa por teclado, lector de pantalla,
+  zoom y movimiento reducido en la aplicación nativa.
 
 ## Hito 4 — pestañas entre ventanas
 
@@ -215,7 +217,9 @@ acción explícita.
 - [ ] Matriz automatizada y manual en macOS Apple Silicon/Intel, Windows y Linux.
 - [ ] Instaladores firmados/notarizados y actualizaciones verificables.
 - [x] Política de migración para preferencias y estado local.
-- [ ] Pruebas de accesibilidad y regresión visual esenciales.
+- [x] Prueba estructural de accesibilidad y revisión visual base en navegador.
+- [ ] Pruebas de accesibilidad con tecnología de asistencia y regresión visual
+  esenciales en la aplicación nativa de cada plataforma.
 - [x] Diagnóstico exportable sin incluir documentos, credenciales ni rutas
   sensibles.
 - [x] Política de privacidad y conectividad que distinga recursos locales,

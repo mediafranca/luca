@@ -376,6 +376,7 @@ function renderTabs() {
     tab.role = "tab";
     tab.tabIndex = doc === active ? 0 : -1;
     tab.ariaSelected = doc === active ? "true" : "false";
+    tab.setAttribute("aria-controls", `editor-${doc.id}`);
     tab.draggable = true;
     tab.title = doc.path ?? "sin guardar";
     const label = document.createElement("span");
@@ -385,6 +386,7 @@ function renderTabs() {
     close.className = "close";
     close.textContent = "×";
     close.title = "Cerrar";
+    close.setAttribute("aria-label", `Cerrar ${baseName(doc.path)}`);
     // El mousedown del tab activa y redibuja las pestañas, lo que destruiría este botón
     // antes del click: el × no lo propaga.
     close.addEventListener("mousedown", (e) => e.stopPropagation());
@@ -392,7 +394,18 @@ function renderTabs() {
     tab.append(label, close);
     tab.addEventListener("mousedown", () => activate(doc));
     tab.addEventListener("keydown", (e) => {
-      if (e.altKey && e.shiftKey && e.key === "ArrowLeft") {
+      if (!e.altKey && !e.shiftKey && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+        e.preventDefault();
+        const index = docs.indexOf(doc);
+        const target = e.key === "Home" ? docs[0]
+          : e.key === "End" ? docs.at(-1)
+          : docs[(index + (e.key === "ArrowLeft" ? -1 : 1) + docs.length) % docs.length];
+        activate(target);
+        tabsEl.querySelector('[aria-selected="true"]')?.focus();
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        activate(doc);
+      } else if (e.altKey && e.shiftKey && e.key === "ArrowLeft") {
         e.preventDefault();
         moveTab(doc, -1);
       } else if (e.altKey && e.shiftKey && e.key === "ArrowRight") {
@@ -495,6 +508,13 @@ function makeDoc(initialDoc, path, selection = null, restored = {}) {
     formatSelection,
     format: interpretedFormat(path, formatSelection, fallback),
   };
+
+  editorEl.id = `editor-${doc.id}`;
+  editorEl.setAttribute("role", "tabpanel");
+  editorEl.setAttribute("aria-label", `Editor de ${baseName(path)}`);
+  previewEl.id = `preview-${doc.id}`;
+  previewEl.setAttribute("role", "region");
+  previewEl.setAttribute("aria-label", `Vista previa de ${baseName(path)}`);
 
   doc.ed = createMarkdownEditor({
     parent: cmMount,
@@ -821,6 +841,14 @@ const paletteEl = document.getElementById("commandPalette");
 const commandQuery = document.getElementById("commandQuery");
 const commandResults = document.getElementById("commandResults");
 const shortcutsEl = document.getElementById("shortcutsDialog");
+let utilityDialogTrigger = null;
+
+function closeUtilityDialog(dialog) {
+  if (!dialog || dialog.hidden) return;
+  dialog.hidden = true;
+  utilityDialogTrigger?.focus?.();
+  utilityDialogTrigger = null;
+}
 
 function renderCommandResults() {
   const commands = matchingCommands(commandList(), commandQuery?.value || "");
@@ -828,17 +856,19 @@ function renderCommandResults() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "command-result";
+    button.setAttribute("role", "option");
     const label = document.createElement("span");
     label.textContent = command.label;
     const shortcut = document.createElement("kbd");
     shortcut.textContent = command.shortcut;
     button.append(label, shortcut);
-    button.addEventListener("click", () => { paletteEl.hidden = true; command.run(); });
+    button.addEventListener("click", () => { closeUtilityDialog(paletteEl); command.run(); });
     return button;
   }));
 }
 
 function openCommandPalette() {
+  utilityDialogTrigger = document.activeElement;
   paletteEl.hidden = false;
   commandQuery.value = "";
   renderCommandResults();
@@ -846,6 +876,7 @@ function openCommandPalette() {
 }
 
 function openShortcuts() {
+  utilityDialogTrigger = document.activeElement;
   const rows = document.getElementById("shortcutRows");
   rows.replaceChildren(...commandList().map((command) => {
     const row = document.createElement("tr");
@@ -859,6 +890,8 @@ function openShortcuts() {
     return row;
   }));
   shortcutsEl.hidden = false;
+  shortcutsEl.querySelector("h2")?.setAttribute("tabindex", "-1");
+  shortcutsEl.querySelector("h2")?.focus();
 }
 
 commandQuery?.addEventListener("input", renderCommandResults);
@@ -868,8 +901,8 @@ commandQuery?.addEventListener("keydown", (event) => {
     commandResults.querySelector("button")?.click();
   }
 });
-paletteEl?.addEventListener("click", (event) => { if (event.target === paletteEl) paletteEl.hidden = true; });
-shortcutsEl?.addEventListener("click", (event) => { if (event.target === shortcutsEl) shortcutsEl.hidden = true; });
+paletteEl?.addEventListener("click", (event) => { if (event.target === paletteEl) closeUtilityDialog(paletteEl); });
+shortcutsEl?.addEventListener("click", (event) => { if (event.target === shortcutsEl) closeUtilityDialog(shortcutsEl); });
 
 // La vista previa abre los enlaces web fuera de Luca. En los modos split y
 // rendered, pulsar cualquier otro bloque abre su Markdown in situ.
@@ -1361,15 +1394,20 @@ function openPrefs() {
     try { wikiTitleInput.value = localStorage.getItem("luca.wikiTitle") || ""; } catch {}
   }
   buildTokenForms();
-  if (prefsEl) prefsEl.hidden = false;
+  utilityDialogTrigger = document.activeElement;
+  if (prefsEl) {
+    prefsEl.hidden = false;
+    document.getElementById("prefsClose")?.focus();
+  }
 }
 
 function closePrefs() {
-  if (prefsEl) prefsEl.hidden = true;
+  closeUtilityDialog(prefsEl);
 }
 
 async function openAbout() {
   if (!aboutEl) return;
+  utilityDialogTrigger = document.activeElement;
   try {
     const version = await TAURI?.app?.getVersion?.();
     if (version) document.getElementById("aboutVersion").textContent = `versión ${version}`;
@@ -1379,7 +1417,7 @@ async function openAbout() {
 }
 
 function closeAbout() {
-  if (aboutEl) aboutEl.hidden = true;
+  closeUtilityDialog(aboutEl);
 }
 
 document.getElementById("aboutClose")?.addEventListener("click", closeAbout);
@@ -1505,8 +1543,8 @@ buildTokenForms();
 // Esc cierra preferencias si están abiertas, o sale del zen si está activo
 addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (paletteEl && !paletteEl.hidden) { e.preventDefault(); paletteEl.hidden = true; return; }
-    if (shortcutsEl && !shortcutsEl.hidden) { e.preventDefault(); shortcutsEl.hidden = true; return; }
+    if (paletteEl && !paletteEl.hidden) { e.preventDefault(); closeUtilityDialog(paletteEl); return; }
+    if (shortcutsEl && !shortcutsEl.hidden) { e.preventDefault(); closeUtilityDialog(shortcutsEl); return; }
     if (prefsEl && !prefsEl.hidden) {
       e.preventDefault();
       e.stopPropagation();

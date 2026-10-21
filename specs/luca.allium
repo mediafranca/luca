@@ -17,6 +17,7 @@
 --   - Contrato de integración con Vera (vera.allium)
 --   - Propiedad y transferencia entre ventanas (ventanas.allium)
 --   - Migración local y diagnóstico compartible (confianza.allium)
+--   - Operación por teclado y semántica de asistencia (accesibilidad.allium)
 --
 -- Excludes:
 --   - Elección de lenguaje/framework (Tauri, CodeMirror, marked, mermaid son
