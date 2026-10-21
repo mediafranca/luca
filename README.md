@@ -87,6 +87,10 @@ Dependencias y licencias: ver [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Cambios por versión
 
+- **0.6.0:** edición Markdown y Wikitext por documento; preview MediaWiki
+  saneada; paleta, ayuda, búsqueda, esquema, recuperación y recientes; pestañas
+  entre ventanas; migración de preferencias, diagnóstico exportable y permisos
+  de red/archivos más estrechos.
 - **0.5.0:** instancia única, apertura múltiple y CLI; pestañas reordenables;
   multiselección; edición por bloques también en vista dividida; enlaces web en
   el navegador predeterminado; identidad pública e instaladores actualizados.
