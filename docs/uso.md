@@ -36,9 +36,10 @@ activa con `Alt+Shift+←` y `Alt+Shift+→`. El texto, los cambios pendientes, 
 historial, la selección, el cursor y el desplazamiento pertenecen a cada
 documento y se conservan al cambiar o mover una pestaña.
 
-Luca funciona como una sola instancia visible. Abrir uno o varios archivos desde
-el sistema o ejecutar otra vez el programa entrega esos archivos a la ventana
-existente, la restaura y la enfoca.
+Luca funciona como una sola instancia del proceso, que puede tener varias
+ventanas. Abrir uno o varios archivos desde el sistema o ejecutar otra vez el
+programa entrega esos archivos a la instancia existente; si una ruta ya está
+abierta, restaura y enfoca la ventana que la contiene.
 
 La instalación registra el comando `luca`:
 

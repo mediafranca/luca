@@ -23,29 +23,26 @@ Principios rectores:
 - una función no está terminada hasta quedar especificada, probada, documentada
   y distribuida correctamente.
 
-## Estado de la rama `alexei`
+## Estado de `main`
 
-La rama contiene una evolución coherente a **v0.5.0** en dos commits locales:
-
-- `a1aec9d`: los enlaces web se abren en el navegador predeterminado y la
-  edición renderizada funciona también en vista mixta;
-- `3dc4732`: instancia única, apertura de varios archivos, CLI inicial, pestañas
-  reordenables, multiselección visible, mejor resaltado, identidad pública,
-  metadatos e instaladores.
+`main` contiene la evolución a **v0.6.0**: instancia única y CLI, edición
+Markdown/Wikitext por documento, preview MediaWiki saneada, fluidez editorial,
+recuperación, pestañas entre ventanas, diagnóstico, migraciones y reducción de
+la superficie de permisos. La rama local `alexei` ya fue integrada y retirada.
 
 Comprobaciones realizadas:
 
-- [x] pruebas JavaScript;
+- [x] ocho suites JavaScript;
 - [x] pruebas Rust aisladas del parser de argumentos;
 - [x] contrato de empaquetado;
 - [x] validación Allium sin errores nuevos;
 - [x] `cargo fmt --check`;
-- [x] revisión visual del frontend;
 - [ ] `cargo check` y build nativo completo en una máquina con encabezados de
   GTK/WebKit instalados;
 - [ ] pruebas manuales de instancia única, menú, asociaciones e instaladores en
   macOS, Windows y Linux;
-- [ ] publicación de la rama, integración en `main`, etiqueta y release.
+- [x] integración local en `main`;
+- [ ] push de `main`, etiqueta `v0.6.0` y release.
 
 Nada de lo marcado como pendiente debe declararse listo sólo porque la interfaz
 web funcione fuera de Tauri.

@@ -1,8 +1,9 @@
 # Contribuir a Luca
 
-Gracias por tu interés en Luca, el editor Markdown de [Vera](https://github.com/mediafranca)
-dentro del ecosistema MediaFranca. Las contribuciones —código, documentación,
-reporte de errores o ideas— son bienvenidas.
+Gracias por tu interés en Luca, el editor Markdown y Wikitext del ecosistema
+MediaFranca y editor externo de [Vera](https://github.com/mediafranca/vera).
+Las contribuciones —código, documentación, reporte de errores o ideas— son
+bienvenidas.
 
 ## Entorno de desarrollo
 
@@ -27,7 +28,8 @@ cargo tauri build
   está en `ui/editor.src.js` y se empaqueta con esbuild a `ui/vendor/`.
 - `src-tauri/` — cáscara nativa (Rust + Tauri).
 - `specs/` — especificación [Allium](https://github.com/mediafranca) del comportamiento.
-- `scripts/vendor.mjs` — vendoriza mermaid/marked y empaqueta CodeMirror.
+- `scripts/vendor.mjs` — copia los motores locales de preview y empaqueta
+  CodeMirror con los modos Markdown y Wikitext.
 
 `ui/vendor/` y `node_modules/` no se versionan: se regeneran con `npm run vendor`.
 
@@ -40,9 +42,26 @@ Luca hace (no sólo cómo lo hace), **actualiza la spec** y valida:
 allium check specs/
 ```
 
-Respeta el contrato con Vera que la spec recoge: Luca guarda el Markdown tal cual
-(sin inyectar metadatos), preserva la sintaxis que no entiende, nunca borra el
-archivo y una apertura nueva no cierra las ya abiertas.
+Respeta el contrato con Vera que la spec recoge: Luca guarda Markdown y Wikitext
+tal cual (sin inyectar metadatos), preserva la sintaxis que no entiende, nunca
+borra el archivo y una apertura nueva no cierra las ya abiertas.
+
+## Verificación
+
+Antes de proponer el cambio, ejecuta lo que corresponda a su alcance:
+
+```bash
+npm test
+npm run vendor -- --force  # si cambió editor.src.js, dependencias o vendor.mjs
+cargo fmt --check --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
+allium check specs/
+```
+
+Las pruebas nativas requieren las dependencias de Tauri/WebKit del sistema. Los
+cambios de interfaz o integración también deben comprobarse manualmente en
+Tauri: una revisión en navegador no cubre diálogos, menús, archivos ni
+asociaciones del sistema.
 
 ## Estilo
 
@@ -54,7 +73,8 @@ archivo y una apertura nueva no cierra las ya abiertas.
 
 1. Crea una rama desde `main`.
 2. Describe el *qué* y el *porqué*; enlaza el issue si lo hay.
-3. Verifica que compila (`cargo tauri dev`) y que `allium check specs/` pasa.
+3. Ejecuta las comprobaciones anteriores y describe cualquier validación manual
+   o de plataforma que haya quedado pendiente.
 
 ## Licencia de las contribuciones
 

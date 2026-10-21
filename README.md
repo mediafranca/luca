@@ -46,8 +46,9 @@ xattr -cr /Applications/Luca.app
 - Diagramas Mermaid, sin conexión.
 - Varios documentos en pestañas. Guardado seguro y aviso si otro programa
   cambió el archivo.
-- Una sola instancia visible: abrir más archivos los reúne en pestañas de la
-  ventana existente. Las pestañas se pueden arrastrar y reordenar.
+- Una sola instancia del proceso, con una o varias ventanas. Abrir más archivos
+  los reúne sin duplicar rutas; las pestañas se pueden reordenar, separar en una
+  ventana nueva y volver a reunir.
 - Multiselección con ⌘D / Ctrl+D para añadir la siguiente aparición, disponible
   también en el menú Edición.
 - Formato por documento con detección por extensión y resaltado Wikitext.
@@ -66,7 +67,8 @@ La instalación registra el comando Luca:
     luca --help
     luca --version
 
-Si Luca ya está abierto, los archivos se entregan a esa ventana.
+Si Luca ya está abierto, los archivos se entregan a la instancia existente y se
+activa la ventana que corresponda.
 
 ## Desde el código
 
