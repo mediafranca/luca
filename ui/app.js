@@ -6,6 +6,7 @@ import { createMarkdownEditor } from "./vendor/codemirror/editor.js";
 import { createEditorToolbar, editDocumentTableAtIndex } from "./toolbar.js";
 import { icon } from "./icons.js";
 import { beginBlockEdit, exitBlockEdit } from "./block-edit.js";
+import { externalWebUrl, isEditablePreviewMode, isInternalAnchor } from "./preview-behavior.js";
 
 const LOCAL = "./vendor";
 const CDN = "https://cdn.jsdelivr.net/npm";
@@ -434,15 +435,31 @@ function applyMode(m) {
   for (const b of document.querySelectorAll("#modebar button[data-mode]"))
     b.classList.toggle("active", b.dataset.mode === m);
   try { localStorage.setItem("luca.mode", m); } catch {}
-  if (active && m !== "rendered") exitBlockEdit(active);
+  if (active && !isEditablePreviewMode(m)) exitBlockEdit(active);
   if (active) syncPreview(active);
 }
 
-// Vista renderizada editable: pulsar un bloque lo abre con su Markdown in situ;
-// pulsar fuera de un bloque cierra el que esté abierto.
-previewsEl.addEventListener("click", (e) => {
+// La vista previa abre los enlaces web fuera de Luca. En los modos split y
+// rendered, pulsar cualquier otro bloque abre su Markdown in situ.
+previewsEl.addEventListener("click", async (e) => {
+  const link = e.target.closest("a[href]");
+  const href = link?.getAttribute("href");
+  const webUrl = externalWebUrl(href, window.location.href);
+  if (webUrl) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      if (TAURI?.opener?.openUrl) await TAURI.opener.openUrl(webUrl);
+      else window.open(webUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.warn("No se pudo abrir el enlace en el navegador del sistema:", error);
+    }
+    return;
+  }
+  if (isInternalAnchor(href)) return;
+
   const doc = active;
-  if (!doc || document.body.dataset.mode !== "rendered") return;
+  if (!doc || !isEditablePreviewMode(document.body.dataset.mode)) return;
   if (e.target.closest(".block-edit, .preview-edit-table")) return;
   const el = e.target.closest("[data-from]");
   if (!el) { exitBlockEdit(doc); return; }

@@ -215,9 +215,10 @@
   .preview-edit-table:hover { background:var(--bg); color:var(--accent); }
   .preview-edit-table .icon { width:12px; height:12px; }
 
-  /* ---- Edición por bloques (modo renderizado): mismo lugar, misma tipografía y
+  /* ---- Edición por bloques (vista mixta y modo renderizado): mismo lugar, misma tipografía y
           mismos colores que el texto previsualizado; sólo un filete de acento a
           la izquierda señala el bloque abierto. ---- */
+  body[data-mode="split"] .doc-preview [data-from],
   body[data-mode="rendered"] .doc-preview [data-from] { cursor:text; }
   .block-edit { border-left:2px solid var(--accent); padding-left:.5em; margin-left:calc(-.5em - 2px); }
   /* Las reglas globales .cm-* pintan con los colores del editor de código; aquí mandan los del texto. */

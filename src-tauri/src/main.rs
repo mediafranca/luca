@@ -156,6 +156,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(Pending(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![read_file, write_file, stat, take_opened_file, print_with_margins])
         .setup(|app| {

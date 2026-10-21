@@ -14,6 +14,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
 
 # Impresión nativa con márgenes en macOS (Tauri imprime con márgenes cero).
 [target.'cfg(target_os = "macos")'.dependencies]

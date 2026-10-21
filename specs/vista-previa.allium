@@ -69,9 +69,16 @@ surface VistaPrevia {
         -- marked y mermaid (con los motores ELK, tidy-tree y ZenUML) se cargan
         -- desde recursos locales; el CDN es sólo respaldo.
 
+    @guarantee EnlacesWebSalenDeLuca
+        -- Al activar un enlace absoluto http o https del documento, luca lo
+        -- abre en el navegador predeterminado del sistema y conserva el
+        -- documento en su ventana. Los anclajes internos siguen navegando
+        -- dentro de la vista previa.
+
     @guidance
         -- La vista previa es sólo una proyección: nunca es la fuente de verdad
         -- ni altera el texto del documento. Esto describe el panel del modo
-        -- split; el modo renderizado es editable por bloques y se especifica
-        -- en edicion-renderizada.allium, siempre a través del texto fuente.
+        -- split; la vista previa de split y el modo renderizado son editables
+        -- por bloques según edicion-renderizada.allium, siempre a través del
+        -- texto fuente.
 }

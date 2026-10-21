@@ -12,6 +12,8 @@
     "core:window:allow-is-fullscreen",
     "core:window:allow-is-maximized",
     "core:webview:allow-print",
-    "dialog:default"
+    "dialog:default",
+    "opener:allow-open-url",
+    "opener:allow-default-urls"
   ]
 }

@@ -1,8 +1,8 @@
 -- allium: 3
 -- edicion-renderizada.allium — edición por bloques sobre la vista renderizada
 --
--- Scope: el modo "renderizado" de luca deja de ser una proyección de sólo
--- lectura y pasa a ser editable por bloques. El Autor señala un bloque en el
+-- Scope: la vista previa de los modos "split" y "renderizado" deja de ser una
+-- proyección de sólo lectura y pasa a ser editable por bloques. El Autor señala un bloque en el
 -- texto renderizado, ese bloque muestra su Markdown fuente en el mismo lugar,
 -- el Autor lo edita y, al abandonarlo, el bloque vuelve a renderizarse. El
 -- texto del documento sigue siendo la única fuente de verdad: editar un bloque
@@ -18,7 +18,7 @@
 --      texto, sin extensiones propias de sintaxis.
 --   4. Los fences (Mermaid y código) son bloques: se editan como texto y el
 --      diagrama o el código se vuelve a renderizar al salir.
---   5. Este modo REEMPLAZA al modo rendered; no es un cuarto modo.
+--   5. Esta edición pertenece a la vista previa de split y rendered; no es un cuarto modo.
 --   6. Entrar y salir de un bloque sin cambiar nada deja el texto idéntico.
 --   7. Cursor e historial al cambiar de modo: no se exige nada.
 --   8. La barra de herramientas sigue actuando sobre el texto fuente. El bloque
@@ -28,8 +28,6 @@
 -- Excludes:
 --   - Cómo se parte el Markdown en bloques (detalle del parser; aquí sólo se
 --     exige que el rango de un bloque sean líneas completas y contiguas)
---   - La vista previa del modo split, que sigue siendo sólo lectura
---     (vista-previa.allium)
 --   - Abrir, guardar y cerrar documentos (documento.allium)
 --
 -- Dependencies: luca.allium, documento.allium, vista-previa.allium
@@ -196,10 +194,9 @@ surface VistaRenderizadaEditable {
         AutorAbandonaBloque(b)
             when b in vista.editando
 
-    @guarantee ReemplazaAlModoRendered
-        -- Esta superficie ES el modo renderizado (⌘3): no se añade un cuarto
-        -- modo. La vista previa del modo split sigue siendo sólo lectura; el
-        -- editor de código está a su lado.
+    @guarantee DisponibleEnSplitYRendered
+        -- Esta superficie está disponible tanto en la vista previa de split
+        -- (⌘2) como en el modo renderizado (⌘3): no se añade un cuarto modo.
 
     @guarantee NoInterpretaLoDesconocido
         -- Lo que el render no entiende (YAML inicial, líneas clave:: valor,
