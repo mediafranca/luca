@@ -78,3 +78,18 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Leer versión de la aplicación
+        id: app-version
+        shell: bash
+        run: node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'version=' + require('./package.json').version + '\n')"
+
+      - name: Generar tamaños y SHA-256 de instaladores
+        shell: bash
+        run: node scripts/artifact-manifest.mjs src-tauri/target "checksums-${{ runner.os }}-${{ runner.arch }}.txt"
+
+      - name: Adjuntar manifiesto verificable al release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "v${{ steps.app-version.outputs.version }}" "checksums-${{ runner.os }}-${{ runner.arch }}.txt" --clobber

@@ -30,6 +30,9 @@ para las mediciones nativas.
 | Windows | `Luca_x.y.z_x64-setup.exe` |
 | Linux | `.AppImage`, `.deb` o `.rpm` |
 
+Cada release incluye archivos `checksums-*.txt` con el tamaño en bytes y el
+SHA-256 de los instaladores producidos en macOS, Windows y Linux.
+
 La app de macOS aún no está firmada. Si el sistema dice que no se puede abrir,
 usa clic derecho y **Abrir**. Si el aviso persiste, en Terminal:
 

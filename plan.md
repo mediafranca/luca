@@ -292,7 +292,8 @@ concentran la mayor parte.
 - [ ] Hacer que CI verifique versiones sincronizadas, contenido de paquetes,
   asociaciones, iconos, specs, pruebas y build de cada plataforma antes de una
   release.
-- [ ] Publicar tamaños y hashes de artefactos para detectar regresiones.
+- [x] Publicar tamaños y hashes de artefactos para detectar regresiones en cada
+  release; la primera publicación efectiva ocurrirá con `v0.6.0`.
 
 ## Criterio de terminado para cualquier hito
 
