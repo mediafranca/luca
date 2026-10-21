@@ -1,0 +1,41 @@
+-- allium: 3
+-- ventanas.allium — propiedad y transferencia de documentos entre ventanas
+
+use "./luca.allium" as luca
+use "./documento.allium" as documento
+
+rule CrearVentana {
+    when: AutorCreaVentana(autor)
+    ensures: documento/Espacio.created()
+}
+
+rule TransferirDocumento {
+    when: AutorMueveDocumento(documento, destino)
+    requires: documento.espacio != destino
+    ensures: documento.espacio = destino
+
+    @guarantee TransferenciaSinPerdida
+        -- Texto guardado o sucio, historial de deshacer, selección, cursores
+        -- múltiples, scroll, formato y modo de vista llegan al destino antes
+        -- de que la pestaña desaparezca del origen.
+
+    @guarantee DuenoUnico
+        -- Una ruta pertenece como máximo a una ventana. Reabrirla enfoca a su
+        -- dueño en vez de crear otra copia.
+
+    @guarantee RecuperacionAnteFallo
+        -- Si el destino no acepta la transferencia, el origen conserva la
+        -- pestaña y su estado íntegro.
+}
+
+surface GestionDeVentanas {
+    facing autor: luca/Autor
+
+    provides:
+        AutorCreaVentana(autor)
+        AutorMueveDocumento(documento, destino)
+
+    @guarantee VentanaExplicita
+        -- La ventana única es el comportamiento normal. Crear, separar o reunir
+        -- ventanas requiere una acción explícita del Autor.
+}

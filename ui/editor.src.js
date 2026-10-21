@@ -9,6 +9,7 @@ import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { gotoLine, openSearchPanel, selectMatches, selectNextOccurrence } from "@codemirror/search";
+import { historyField } from "@codemirror/commands";
 import { tags as t } from "@lezer/highlight";
 import { mediawikiLanguage } from "@bhsd/codemirror-wikitext";
 import mediawikiConfig from "wikiparser-node/config/default.json" with { type: "json" };
@@ -80,25 +81,25 @@ const themeFor = (dark, block) =>
 const languageFor = (format) =>
   format === "wikitext" ? mediawikiLanguage(mediawikiConfig) : markdown({ base: markdownLanguage });
 
-export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, block = false, format = "markdown", lineSeparator = "\n" }) {
+export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, block = false, format = "markdown", lineSeparator = "\n", stateJson = null }) {
   const themeComp = new Compartment();
   const languageComp = new Compartment();
+  const extensions = [
+    block ? minimalSetup : basicSetup,
+    languageComp.of(languageFor(block ? "markdown" : format)),
+    EditorState.lineSeparator.of(lineSeparator),
+    EditorView.lineWrapping,
+    themeComp.of(themeFor(dark, block)),
+    EditorView.updateListener.of((u) => {
+      if (u.docChanged) onChange(u.state.doc.toString());
+      if (u.selectionSet || u.docChanged) onCursor?.();
+    }),
+  ];
   const view = new EditorView({
     parent,
-    state: EditorState.create({
-      doc,
-      extensions: [
-        block ? minimalSetup : basicSetup,
-        languageComp.of(languageFor(block ? "markdown" : format)),
-        EditorState.lineSeparator.of(lineSeparator),
-        EditorView.lineWrapping,
-        themeComp.of(themeFor(dark, block)),
-        EditorView.updateListener.of((u) => {
-          if (u.docChanged) onChange(u.state.doc.toString());
-          if (u.selectionSet || u.docChanged) onCursor?.();
-        }),
-      ],
-    }),
+    state: stateJson
+      ? EditorState.fromJSON(stateJson, { extensions }, { history: historyField })
+      : EditorState.create({ doc, extensions }),
   });
   // Recalcular medidas cuando Plex Mono termine de cargar: evita que la
   // numeración y el contenido queden desalineados por medir con otra fuente.
@@ -123,6 +124,9 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
     gotoLine: () => { gotoLine(view); view.focus(); },
     selectAllMatches: () => { selectMatches(view); view.focus(); },
     getView: () => view,
+    serialize: () => view.state.toJSON({ history: historyField }),
+    getScroll: () => ({ top: view.scrollDOM.scrollTop, left: view.scrollDOM.scrollLeft }),
+    setScroll: ({ top = 0, left = 0 } = {}) => requestAnimationFrame(() => view.scrollDOM.scrollTo({ top, left })),
     getSelection: () => {
       const sel = view.state.selection.main;
       return {

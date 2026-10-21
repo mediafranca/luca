@@ -11,25 +11,30 @@ import DOMPurify from "./vendor/dompurify/purify.es.mjs";
 import { recentPaths, sessionSnapshot, validSession } from "./session-state.js";
 import { matchingCommands } from "./command-search.js";
 import { detectedLineEnding, documentHeadings } from "./document-outline.js";
+import { diagnosticReport, migrateSettings } from "./settings-state.js";
+
+try { migrateSettings(localStorage); } catch {}
+
+const PREVIEW_SANITIZE_OPTIONS = {
+  USE_PROFILES: { html: true },
+  FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "meta", "link", "base"],
+  FORBID_ATTR: ["style", "srcset"],
+};
 
 let marked;
 let mermaid;
 let previewRuntimePromise;
+let elkRuntimePromise;
+let tidyRuntimePromise;
+let zenumlRuntimePromise;
 
-function ensurePreviewRuntime() {
-  if (previewRuntimePromise) return previewRuntimePromise;
-  previewRuntimePromise = Promise.all([
+async function ensurePreviewRuntime(source = "") {
+  if (!previewRuntimePromise) previewRuntimePromise = Promise.all([
     import("./vendor/marked/marked.esm.js"),
     import("./vendor/mermaid/mermaid.esm.min.mjs"),
-    import("./vendor/layout-elk/mermaid-layout-elk.esm.min.mjs"),
-    import("./vendor/tidy-tree/mermaid-layout-tidy-tree.esm.min.mjs"),
-    import("./vendor/zenuml/mermaid-zenuml.esm.min.mjs"),
-  ]).then(async ([markedMod, mermaidMod, elkMod, tidyMod, zenumlMod]) => {
+  ]).then(([markedMod, mermaidMod]) => {
     marked = markedMod.marked;
     mermaid = mermaidMod.default;
-    await mermaid.registerLayoutLoaders(elkMod.default);
-    await mermaid.registerLayoutLoaders(tidyMod.default);
-    await mermaid.registerExternalDiagrams([zenumlMod.default]);
     marked.use({
       renderer: {
         code(code, lang) {
@@ -41,7 +46,21 @@ function ensurePreviewRuntime() {
     });
     initMermaid();
   });
-  return previewRuntimePromise;
+  await previewRuntimePromise;
+  const registrations = [];
+  if (/\b(?:elk|layout\s*:\s*elk)\b/i.test(source)) {
+    elkRuntimePromise ||= import("./vendor/layout-elk/mermaid-layout-elk.esm.min.mjs").then((mod) => mermaid.registerLayoutLoaders(mod.default));
+    registrations.push(elkRuntimePromise);
+  }
+  if (/\b(?:tidy-tree|tidy_tree)\b/i.test(source)) {
+    tidyRuntimePromise ||= import("./vendor/tidy-tree/mermaid-layout-tidy-tree.esm.min.mjs").then((mod) => mermaid.registerLayoutLoaders(mod.default));
+    registrations.push(tidyRuntimePromise);
+  }
+  if (/\bzenuml\b/i.test(source)) {
+    zenumlRuntimePromise ||= import("./vendor/zenuml/mermaid-zenuml.esm.min.mjs").then((mod) => mermaid.registerExternalDiagrams([mod.default]));
+    registrations.push(zenumlRuntimePromise);
+  }
+  await Promise.all(registrations);
 }
 
 const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -93,6 +112,7 @@ const tabsEl = document.getElementById("tabs");
 const editorsEl = document.getElementById("editors");
 const previewsEl = document.getElementById("previews");
 const TAURI = window.__TAURI__;
+const windowLabel = TAURI?.window?.getCurrentWindow?.().label || "web";
 
 const docs = [];     // documentos abiertos
 let active = null;   // documento activo
@@ -103,6 +123,7 @@ let restoringSession = false;
 let sessionTimer = null;
 
 const SESSION_KEY = "luca.session.v1";
+const sessionStorageKey = `${SESSION_KEY}.${windowLabel}`;
 const RECENT_KEY = "luca.recentFiles";
 const readJsonStorage = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
@@ -115,7 +136,7 @@ function saveSessionSoon() {
 function saveSessionNow() {
   if (restoringSession) return;
   const snapshot = sessionSnapshot(docs.map((doc) => ({ ...doc, content: doc.ed.getDoc() })), active?.id);
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify(snapshot)); } catch {}
+  try { localStorage.setItem(sessionStorageKey, JSON.stringify(snapshot)); } catch {}
 }
 function rememberRecent(path) {
   if (!path) return;
@@ -213,7 +234,7 @@ function renderBlocks(src) {
     line += nl(text.slice(pos, at));
     if (tok.type !== "space") {
       const t = document.createElement("template");
-      t.innerHTML = marked.parser([tok]);
+      t.innerHTML = DOMPurify.sanitize(marked.parser([tok]), PREVIEW_SANITIZE_OPTIONS);
       const src = tok.raw.replace(/\n+$/, "");   // sin las líneas en blanco que separan bloques
       for (const el of t.content.children) {
         el.dataset.line = line;
@@ -245,11 +266,7 @@ async function renderDoc(doc, force = false) {
     try {
       const html = await TAURI.core.invoke("parse_wikitext", { apiUrl: api, title: wikiTitle(doc), text: doc.ed.getDoc() });
       if (renderVersion !== doc.renderVersion) return;
-      const clean = DOMPurify.sanitize(html, {
-        USE_PROFILES: { html: true },
-        FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "meta", "link", "base"],
-        FORBID_ATTR: ["style", "srcset"],
-      });
+      const clean = DOMPurify.sanitize(html, PREVIEW_SANITIZE_OPTIONS);
       const template = document.createElement("template");
       template.innerHTML = clean;
       const origin = new URL(api).origin;
@@ -279,9 +296,10 @@ async function renderDoc(doc, force = false) {
     }
     return;
   }
-  await ensurePreviewRuntime();
+  const source = doc.ed.getDoc();
+  await ensurePreviewRuntime(source);
   if (renderVersion !== doc.renderVersion) return;
-  doc.previewEl.replaceChildren(renderBlocks(doc.ed.getDoc()));
+  doc.previewEl.replaceChildren(renderBlocks(source));
 
   // Resolver rutas relativas de imágenes y medios locales respecto al archivo abierto
   const docDir = getDocDir(doc);
@@ -332,8 +350,7 @@ async function renderDoc(doc, force = false) {
   syncPreview(doc);
 }
 
-// ponytail: 150ms debounce por documento. Un render viejo que siga corriendo
-// escribe sobre bloques que el innerHTML nuevo ya reemplazó; inocuo para el MVP.
+// 150 ms de debounce por documento; renderVersion descarta resultados obsoletos.
 function onEdit(doc) {
   if (!doc.dirty) { doc.dirty = true; renderTabs(); if (doc === active) setTitle(); }
   clearTimeout(doc.t);
@@ -394,9 +411,18 @@ function renderTabs() {
       reorderTab(draggedTabId, doc.id, placement);
       draggedTabId = null;
     });
-    tab.addEventListener("dragend", () => {
+    tab.addEventListener("dragend", async (event) => {
+      const detached = event.dataTransfer?.dropEffect === "none" &&
+        (event.screenX !== 0 || event.screenY !== 0) &&
+        (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= innerWidth || event.clientY >= innerHeight);
       draggedTabId = null;
       tab.classList.remove("dragging", "drop-target");
+      if (detached) {
+        try {
+          const target = await TAURI?.core.invoke("window_at_point", { x: event.screenX, y: event.screenY, exclude: windowLabel });
+          await moveTabToWindow(doc, target || null);
+        } catch (error) { alert(error); }
+      }
     });
     return tab;
   }));
@@ -430,7 +456,7 @@ function activate(doc) {
   doc.ed.focus();
 }
 
-function makeDoc(initialDoc, path, selection = null) {
+function makeDoc(initialDoc, path, selection = null, restored = {}) {
   const editorEl = document.createElement("div");
   editorEl.className = "doc-editor";
   const cmMount = document.createElement("div");
@@ -446,8 +472,8 @@ function makeDoc(initialDoc, path, selection = null) {
   const doc = {
     id: nextId++,
     path: path ?? null,
-    dirty: false,
-    lastMtime: null,
+    dirty: Boolean(restored.dirty),
+    lastMtime: restored.lastMtime ?? null,
     editorEl,
     cmMount,
     previewEl,
@@ -456,7 +482,7 @@ function makeDoc(initialDoc, path, selection = null) {
     block: null,   // bloque en edición en la vista renderizada (block-edit.js)
     renderVersion: 0,
     wikiCache: null,
-    lineEnding: detectedLineEnding(initialDoc),
+    lineEnding: restored.lineEnding || detectedLineEnding(initialDoc),
     formatSelection,
     format: interpretedFormat(path, formatSelection, fallback),
   };
@@ -469,7 +495,9 @@ function makeDoc(initialDoc, path, selection = null) {
     onCursor: () => { syncPreview(doc); updateCursorStatus(doc); },
     format: doc.format,
     lineSeparator: doc.lineEnding === "CRLF" ? "\r\n" : doc.lineEnding === "CR" ? "\r" : "\n",
+    stateJson: restored.editorState || null,
   });
+  if (restored.scroll) doc.ed.setScroll(restored.scroll);
   editorEl.append(cmMount);
 
   docs.push(doc);
@@ -483,11 +511,20 @@ const findByPath = (path) => docs.find((d) => d.path && d.path === path);
 async function openPath(path) {
   const existing = findByPath(path);        // contrato: reabrir reutiliza, no duplica
   if (existing) { activate(existing); return existing; }
-  const content = await TAURI.core.invoke("read_file", { path });
-  const doc = makeDoc(content, path);
-  doc.lastMtime = await TAURI.core.invoke("stat", { path });
-  rememberRecent(path);
-  return doc;
+  if (TAURI) {
+    const owner = await TAURI.core.invoke("claim_document", { path, windowLabel });
+    if (owner) { await TAURI.core.invoke("focus_window", { label: owner }); return null; }
+  }
+  try {
+    const content = await TAURI.core.invoke("read_file", { path });
+    const doc = makeDoc(content, path);
+    doc.lastMtime = await TAURI.core.invoke("stat", { path });
+    rememberRecent(path);
+    return doc;
+  } catch (error) {
+    if (TAURI) await TAURI.core.invoke("release_document", { path, windowLabel }).catch(() => {});
+    throw error;
+  }
 }
 
 async function openFile() {
@@ -505,7 +542,8 @@ document.getElementById("recentFiles")?.addEventListener("change", async (event)
 });
 
 async function saveDoc(doc, forceDialog = false) {
-  let path = doc.path;
+  const previousPath = doc.path;
+  let path = previousPath;
   const isNew = forceDialog || !path;
   if (isNew) {
     const ext = doc.format === "wikitext" ? "wiki" : "md";
@@ -517,8 +555,21 @@ async function saveDoc(doc, forceDialog = false) {
     if (cur !== null && doc.lastMtime !== null && cur !== doc.lastMtime &&
         !confirm("El archivo cambió fuera de luca. ¿Sobrescribir?")) return;
   }
-  doc.lastMtime = await TAURI.core.invoke("write_file", { path, contents: doc.ed.getDoc() });
+  const claimsNewPath = Boolean(TAURI && path !== previousPath);
+  if (claimsNewPath) {
+    const owner = await TAURI.core.invoke("claim_document", { path, windowLabel });
+    if (owner) { await TAURI.core.invoke("focus_window", { label: owner }); return; }
+  }
+  try {
+    doc.lastMtime = await TAURI.core.invoke("write_file", { path, contents: doc.ed.getDoc() });
+  } catch (error) {
+    if (claimsNewPath) await TAURI.core.invoke("release_document", { path, windowLabel }).catch(() => {});
+    throw error;
+  }
   doc.path = path; doc.dirty = false;
+  if (claimsNewPath && previousPath) {
+    TAURI.core.invoke("release_document", { path: previousPath, windowLabel }).catch(() => {});
+  }
   if (doc.formatSelection === "auto") {
     doc.format = interpretedFormat(path, "auto", newDocumentFormat());
     doc.ed.setFormat(doc.format);
@@ -533,17 +584,54 @@ async function saveDoc(doc, forceDialog = false) {
 
 const newDoc = () => makeDoc("", null, newDocumentFormat());
 
-function closeDoc(doc) {
-  if (doc.dirty && !confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`)) return;
+function closeDoc(doc, { force = false, release = true, replacement = true } = {}) {
+  if (!force && doc.dirty && !confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`)) return false;
   const i = docs.indexOf(doc);
   exitBlockEdit(doc, false);
   doc.editorEl.remove();
   doc.previewEl.remove();
   docs.splice(i, 1);
-  if (docs.length === 0) { newDoc(); return; }   // siempre al menos un documento
+  if (release && doc.path && TAURI) TAURI.core.invoke("release_document", { path: doc.path, windowLabel }).catch(() => {});
+  if (docs.length === 0) { if (replacement) newDoc(); return true; }
   if (active === doc) activate(docs[Math.min(i, docs.length - 1)]);
   else renderTabs();
   saveSessionSoon();
+  return true;
+}
+
+function transferableTab(doc) {
+  return {
+    path: doc.path,
+    dirty: doc.dirty,
+    lastMtime: doc.lastMtime,
+    formatSelection: doc.formatSelection,
+    lineEnding: doc.lineEnding,
+    editorState: doc.ed.serialize(),
+    scroll: doc.ed.getScroll(),
+    mode: document.body.dataset.mode,
+  };
+}
+
+async function moveTabToWindow(doc, target = null) {
+  if (!TAURI || !doc) return;
+  const targetLabel = target || await TAURI.core.invoke("create_editor_window");
+  await TAURI.core.invoke("transfer_tab", { target: targetLabel, payload: transferableTab(doc) });
+  closeDoc(doc, { force: true, release: false, replacement: false });
+  if (docs.length === 0) await TAURI.window.getCurrentWindow().close();
+}
+
+async function receiveTransferredTabs() {
+  if (!TAURI) return;
+  const incoming = await TAURI.core.invoke("take_transferred_tabs", { windowLabel });
+  if (incoming.length && docs.length === 1 && !docs[0].path && !docs[0].dirty && docs[0].ed.getDoc() === "") {
+    closeDoc(docs[0], { force: true, replacement: false });
+  }
+  for (const payload of incoming) {
+    const doc = makeDoc(payload.editorState?.doc || "", payload.path, payload.formatSelection || "auto", payload);
+    if (payload.mode) applyMode(payload.mode);
+    rememberRecent(payload.path);
+    activate(doc);
+  }
 }
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
@@ -558,7 +646,9 @@ addEventListener(
     if (e.key === "F1") { e.preventDefault(); openShortcuts(); return; }
     if (!(e.metaKey || e.ctrlKey)) return;
     const k = e.key.toLowerCase();
-    if (e.shiftKey && k === "p") { e.preventDefault(); openCommandPalette(); }
+    if (e.shiftKey && k === "n") { e.preventDefault(); TAURI?.core.invoke("create_editor_window"); }
+    else if (e.shiftKey && k === "m") { e.preventDefault(); moveTabToWindow(active).catch((error) => alert(error)); }
+    else if (e.shiftKey && k === "p") { e.preventDefault(); openCommandPalette(); }
     else if (k === "n") { e.preventDefault(); newDoc(); }
     else if (k === "w") { e.preventDefault(); if (active) closeDoc(active); }
     else if (e.shiftKey && k === "z") { e.preventDefault(); toggleZen(); }
@@ -592,6 +682,14 @@ if (TAURI) {
     else if (id === "select_next_occurrence") { a?.ed.selectNextOccurrence(); }
     else if (id === "command_palette") openCommandPalette();
     else if (id === "shortcuts") openShortcuts();
+    else if (id === "new_window") TAURI.core.invoke("create_editor_window");
+    else if (id === "detach_tab") moveTabToWindow(a).catch((error) => alert(error));
+    else if (id === "gather_windows") TAURI.core.invoke("gather_windows", { target: windowLabel });
+  });
+  TAURI.event.listen("tab-transfer-available", receiveTransferredTabs);
+  TAURI.event.listen("gather-tabs", (event) => {
+    const target = event.payload;
+    Promise.all([...docs].map((doc) => moveTabToWindow(doc, target))).catch((error) => alert(error));
   });
 }
 
@@ -706,6 +804,8 @@ function applyMode(m) {
 const shortcutPrefix = navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+";
 const commandList = () => [
   { label: "Nuevo documento", shortcut: `${shortcutPrefix}N`, run: newDoc },
+  { label: "Nueva ventana", shortcut: `${shortcutPrefix}Shift+N`, run: () => TAURI?.core.invoke("create_editor_window") },
+  { label: "Mover pestaña a nueva ventana", shortcut: `${shortcutPrefix}Shift+M`, run: () => moveTabToWindow(active) },
   { label: "Abrir archivo", shortcut: `${shortcutPrefix}O`, run: openFile },
   { label: "Guardar", shortcut: `${shortcutPrefix}S`, run: () => active && saveDoc(active) },
   { label: "Guardar como", shortcut: `${shortcutPrefix}Shift+S`, run: () => active && saveDoc(active, true) },
@@ -1310,6 +1410,7 @@ function resetTokens() {
 // Exportar/importar todos los tokens (código, lectura, interfaz, claro y oscuro) como JSON.
 // El esquema claro/oscuro es una preferencia del dispositivo y no viaja con el archivo.
 const TOKENS_FILTER = [{ name: "Tokens de Luca", extensions: ["json"] }];
+const DIAGNOSTIC_FILTER = [{ name: "Diagnóstico de Luca", extensions: ["json"] }];
 
 async function exportTokens() {
   const path = await TAURI.dialog.save({ defaultPath: "luca-tokens.json", filters: TOKENS_FILTER });
@@ -1332,6 +1433,21 @@ async function importTokens() {
   buildTokenForms();
 }
 
+async function exportDiagnostic() {
+  const path = await TAURI.dialog.save({ defaultPath: "luca-diagnostico.json", filters: DIAGNOSTIC_FILTER });
+  if (!path) return;
+  let version = "desconocida";
+  try { version = await TAURI?.app?.getVersion?.() || version; } catch {}
+  const report = diagnosticReport({
+    version,
+    platform: navigator.userAgentData?.platform || navigator.platform,
+    windowLabel,
+    activeFormat: active?.format,
+    documents: docs,
+  });
+  await TAURI.core.invoke("write_file", { path, contents: `${JSON.stringify(report, null, 2)}\n` });
+}
+
 if (prefsEl) {
   // Arrastre del panel desde su título; queda donde se suelte (dentro de la ventana).
   prefsEl.querySelector(".prefs-panel h2")?.addEventListener("pointerdown", (e) => {
@@ -1351,6 +1467,7 @@ if (prefsEl) {
   document.getElementById("prefsReset")?.addEventListener("click", resetTokens);
   document.getElementById("prefsExport")?.addEventListener("click", exportTokens);
   document.getElementById("prefsImport")?.addEventListener("click", importTokens);
+  document.getElementById("prefsDiagnostic")?.addEventListener("click", exportDiagnostic);
   mermaidSel?.addEventListener("change", () => {
     try { localStorage.setItem("luca.mermaidTheme", mermaidSel.value); } catch {}
     initMermaid();
@@ -1505,7 +1622,7 @@ async function drainLaunchRequest() {
 }
 
 async function restorePreviousSession() {
-  const snapshot = readJsonStorage(SESSION_KEY, null);
+  const snapshot = readJsonStorage(sessionStorageKey, null);
   if (!validSession(snapshot) || snapshot.documents.length === 0) return false;
   restoringSession = true;
   const restored = [];
@@ -1517,6 +1634,13 @@ async function restorePreviousSession() {
       const doc = makeDoc(content, item.path, item.formatSelection || "auto");
       doc.dirty = Boolean(item.dirty && item.content !== null);
       if (item.path && TAURI) doc.lastMtime = await TAURI.core.invoke("stat", { path: item.path });
+      if (item.path && TAURI) {
+        const owner = await TAURI.core.invoke("claim_document", { path: item.path, windowLabel });
+        if (owner) {
+          closeDoc(doc, { force: true, release: false, replacement: false });
+          continue;
+        }
+      }
       restored.push(doc);
     } catch {}
   }
@@ -1537,4 +1661,9 @@ addEventListener("beforeunload", (event) => {
 });
 
 renderRecentFiles();
-if (!(await drainLaunchRequest()) && !(await restorePreviousSession())) makeDoc(SAMPLE, null);
+if (windowLabel === "main") {
+  if (!(await drainLaunchRequest()) && !(await restorePreviousSession())) makeDoc(SAMPLE, null);
+} else {
+  await receiveTransferredTabs();
+  if (!docs.length) newDoc();
+}

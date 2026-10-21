@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::{collections::HashMap, sync::atomic::AtomicUsize};
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
@@ -93,6 +94,112 @@ mod file_argument;
 struct Pending {
     files: Mutex<Vec<String>>,
     new_document: AtomicBool,
+}
+
+#[derive(Default)]
+struct WindowRegistry {
+    next_id: AtomicUsize,
+    owners: Mutex<HashMap<String, String>>,
+    transfers: Mutex<HashMap<String, Vec<serde_json::Value>>>,
+}
+
+#[tauri::command]
+fn create_editor_window(
+    app: tauri::AppHandle,
+    registry: tauri::State<WindowRegistry>,
+) -> Result<String, String> {
+    let id = registry.next_id.fetch_add(1, Ordering::SeqCst) + 1;
+    let label = format!("editor-{id}");
+    tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("index.html".into()))
+        .title("Luca")
+        .inner_size(960.0, 620.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(label)
+}
+
+#[tauri::command]
+fn transfer_tab(
+    app: tauri::AppHandle,
+    registry: tauri::State<WindowRegistry>,
+    target: String,
+    payload: serde_json::Value,
+) -> Result<(), String> {
+    if app.get_webview_window(&target).is_none() {
+        return Err("La ventana de destino ya no existe".into());
+    }
+    if let Some(path) = payload.get("path").and_then(|value| value.as_str()) {
+        registry.owners.lock().unwrap().insert(path.to_string(), target.clone());
+    }
+    registry.transfers.lock().unwrap().entry(target.clone()).or_default().push(payload);
+    let _ = app.emit_to(&target, "tab-transfer-available", ());
+    Ok(())
+}
+
+#[tauri::command]
+fn take_transferred_tabs(
+    registry: tauri::State<WindowRegistry>,
+    window_label: String,
+) -> Vec<serde_json::Value> {
+    registry.transfers.lock().unwrap().remove(&window_label).unwrap_or_default()
+}
+
+#[tauri::command]
+fn claim_document(
+    app: tauri::AppHandle,
+    registry: tauri::State<WindowRegistry>,
+    path: String,
+    window_label: String,
+) -> Option<String> {
+    let mut owners = registry.owners.lock().unwrap();
+    if let Some(owner) = owners.get(&path) {
+        if owner != &window_label && app.get_webview_window(owner).is_some() {
+            return Some(owner.clone());
+        }
+    }
+    owners.insert(path, window_label);
+    None
+}
+
+#[tauri::command]
+fn release_document(registry: tauri::State<WindowRegistry>, path: String, window_label: String) {
+    let mut owners = registry.owners.lock().unwrap();
+    if owners.get(&path) == Some(&window_label) {
+        owners.remove(&path);
+    }
+}
+
+#[tauri::command]
+fn focus_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
+    let window = app.get_webview_window(&label).ok_or_else(|| "La ventana ya no existe".to_string())?;
+    window.show().and_then(|_| window.unminimize()).and_then(|_| window.set_focus()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn gather_windows(app: tauri::AppHandle, target: String) -> Result<(), String> {
+    if app.get_webview_window(&target).is_none() {
+        return Err("La ventana de destino ya no existe".into());
+    }
+    for label in app.webview_windows().keys().filter(|label| *label != &target) {
+        let _ = app.emit_to(label, "gather-tabs", target.clone());
+    }
+    focus_window(app, target)
+}
+
+#[tauri::command]
+fn window_at_point(app: tauri::AppHandle, x: f64, y: f64, exclude: String) -> Option<String> {
+    for (label, window) in app.webview_windows() {
+        if label == exclude || !window.is_visible().unwrap_or(false) { continue; }
+        let scale = window.scale_factor().ok()?;
+        let position = window.outer_position().ok()?;
+        let size = window.outer_size().ok()?;
+        let left = position.x as f64 / scale;
+        let top = position.y as f64 / scale;
+        let right = left + size.width as f64 / scale;
+        let bottom = top + size.height as f64 / scale;
+        if x >= left && x <= right && y >= top && y <= bottom { return Some(label); }
+    }
+    None
 }
 
 // I/O byte-fiel: el archivo se guarda tal cual lo escribió el usuario.
@@ -255,6 +362,8 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
 
     let ventana = SubmenuBuilder::new(app, "Ventana")
+        .item(&item("new_window", "Nueva ventana", Some("CmdOrCtrl+Shift+N"))?)
+        .item(&item("detach_tab", "Mover pestaña a nueva ventana", Some("CmdOrCtrl+Shift+M"))?)
         .item(&item(
             "move_tab_left",
             "Mover pestaña a la izquierda",
@@ -265,6 +374,8 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
             "Mover pestaña a la derecha",
             Some("Alt+Shift+Right"),
         )?)
+        .separator()
+        .item(&item("gather_windows", "Reunir todas las ventanas", None)?)
         .separator()
         .minimize()
         .build()?;
@@ -305,6 +416,16 @@ fn main() {
     let startup_request = file_argument::parse_launch_arguments(startup_args, &startup_cwd);
 
     tauri::Builder::default()
+        .plugin(
+            tauri::plugin::Builder::new("navigation-guard")
+                .on_navigation(|_, url| {
+                    url.scheme() == "tauri"
+                        || matches!(url.host_str(), Some("tauri.localhost"))
+                        || (cfg!(debug_assertions)
+                            && matches!(url.host_str(), Some("localhost" | "127.0.0.1")))
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             let request = file_argument::parse_launch_arguments(args, std::path::Path::new(&cwd));
             if let Some(pending) = app.try_state::<Pending>() {
@@ -326,6 +447,7 @@ fn main() {
             files: Mutex::new(Vec::new()),
             new_document: AtomicBool::new(false),
         })
+        .manage(WindowRegistry::default())
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
@@ -333,7 +455,15 @@ fn main() {
             take_opened_files,
             take_new_document,
             print_with_margins,
-            parse_wikitext
+            parse_wikitext,
+            create_editor_window,
+            transfer_tab,
+            take_transferred_tabs,
+            claim_document,
+            release_document,
+            focus_window,
+            gather_windows,
+            window_at_point
         ])
         .setup(move |app| {
             *app.state::<Pending>().files.lock().unwrap() = startup_request.files.clone();
@@ -344,7 +474,12 @@ fn main() {
             Ok(())
         })
         .on_menu_event(|app, event| {
-            if let Some(w) = app.get_webview_window("main") {
+            let focused = app
+                .webview_windows()
+                .into_values()
+                .find(|window| window.is_focused().unwrap_or(false))
+                .or_else(|| app.get_webview_window("main"));
+            if let Some(w) = focused {
                 let _ = w.emit("menu", event.id().0.clone());
             }
         })

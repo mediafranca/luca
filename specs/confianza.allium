@@ -1,0 +1,35 @@
+-- allium: 3
+-- confianza.allium — migración local y diagnóstico compartible
+
+use "./luca.allium" as luca
+
+rule MigrarPreferencias {
+    when: AutorIniciaLuca(autor)
+
+    @guarantee MigracionIncremental
+        -- Luca aplica en orden las migraciones anteriores a la versión de
+        -- esquema actual y registra esa versión una sola vez.
+
+    @guarantee PreferenciasDesconocidas
+        -- Una migración conserva claves que no reconoce y no borra documentos.
+}
+
+rule ExportarDiagnostico {
+    when: AutorExportaDiagnostico(autor)
+
+    @guarantee DatosTecnicos
+        -- El resultado identifica versión, plataforma, esquema, capacidades y
+        -- conteos de pestañas por estado y formato.
+
+    @guarantee SinContenidoSensible
+        -- El resultado no incluye contenido, nombres o rutas de documentos,
+        -- recientes, URL de la wiki, cookies, credenciales ni tokens de diseño.
+}
+
+surface Confianza {
+    facing autor: luca/Autor
+
+    provides:
+        AutorIniciaLuca(autor)
+        AutorExportaDiagnostico(autor)
+}
