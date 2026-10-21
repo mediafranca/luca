@@ -19,7 +19,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://asset.localhost data: https:; font-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net",
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://asset.localhost data: https:; font-src 'self' data:; connect-src 'self'",
       "dangerousDisableAssetCspModification": ["style-src"],
       "assetProtocol": {
         "enable": true,
@@ -35,8 +35,8 @@
     "copyright": "© 2026 Herbert Spencer González",
     "license": "EUPL-1.2",
     "category": "Productivity",
-    "shortDescription": "Editor Markdown de escritorio",
-    "longDescription": "Luca es una iniciativa de MediaFranca creada por Herbert Spencer: un editor Markdown local para pensar y escribir con archivos propios.",
+    "shortDescription": "Editor Markdown y Wikitext de escritorio",
+    "longDescription": "Luca es una iniciativa de MediaFranca creada por Herbert Spencer: un editor local de Markdown y Wikitext para pensar y escribir con archivos propios.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -57,6 +57,13 @@
         "description": "Documento Markdown",
         "role": "Editor",
         "mimeType": "text/markdown"
+      },
+      {
+        "ext": ["wiki", "wikitext"],
+        "name": "Wikitext Document",
+        "description": "Documento Wikitext",
+        "role": "Editor",
+        "mimeType": "text/x-wiki"
       }
     ]
   }

@@ -22,6 +22,8 @@ surface Editor {
         for d in espacio.documentos:
             d.ruta
             d.sucio
+            d.formato
+            d.seleccion_formato
 
     provides:
         AutorAbreArchivo(archivo)
@@ -36,6 +38,8 @@ surface Editor {
             when d in espacio.documentos
         AutorReordenaPestana(d, junto_a, lado)
             when d in espacio.documentos and junto_a in espacio.documentos and d != junto_a
+        AutorCambiaFormato(d, seleccion)
+            when d in espacio.documentos
 
     @guarantee AperturaNoReemplaza
         -- Abrir un documento nunca cierra ni reemplaza los ya abiertos; cada
@@ -52,6 +56,34 @@ surface Editor {
         -- Luca como una iniciativa de MediaFranca creada por Herbert Spencer,
         -- enlazan Casiopea y GitHub, declaran la licencia EUPL 1.2 y usan la
         -- letra capital L inspirada en Luca Pacioli como icono de la aplicación.
+
+    @guarantee FormatoPorDocumento
+        -- Pestañas Markdown y Wikitext pueden coexistir. Automático infiere
+        -- .md/.markdown como Markdown y .wiki/.wikitext como Wikitext; una
+        -- selección explícita se conserva aunque la extensión discrepe y la
+        -- interfaz avisa sin impedir guardar.
+
+    @guarantee RestauracionDeSesion
+        -- Al volver a abrir luca se restaura el orden de pestañas, la activa y
+        -- los borradores recuperables. La recuperación nunca sustituye el
+        -- archivo original ni lo marca guardado.
+
+    @guarantee ArchivosRecientes
+        -- Las rutas abiertas o guardadas recientemente son consultables desde
+        -- la interfaz, sin duplicados y con la más reciente primero.
+
+    @guarantee CierreConCambios
+        -- Cerrar la ventana con documentos sucios solicita confirmación y deja
+        -- una instantánea local de recuperación antes de salir.
+
+    @guarantee FuncionesEncontrables
+        -- La ayuda enumera acciones y atajos. La paleta busca comandos por
+        -- nombre o atajo y ejecuta las mismas acciones que menús e interfaz.
+
+    @guarantee NavegacionYEstado
+        -- El esquema permite saltar a encabezados Markdown o Wikitext. La
+        -- barra de estado muestra línea, columna, UTF-8, fin de línea y formato
+        -- del documento activo.
 }
 
 ------------------------------------------------------------
@@ -81,7 +113,7 @@ surface VistaPrevia {
 
     @guarantee RenderOffline
         -- marked y mermaid (con los motores ELK, tidy-tree y ZenUML) se cargan
-        -- desde recursos locales; el CDN es sólo respaldo.
+        -- exclusivamente desde recursos locales; no existe respaldo CDN.
 
     @guarantee EnlacesWebSalenDeLuca
         -- Al activar un enlace absoluto http o https del documento, luca lo
@@ -95,4 +127,35 @@ surface VistaPrevia {
         -- split; la vista previa de split y el modo renderizado son editables
         -- por bloques según edicion-renderizada.allium, siempre a través del
         -- texto fuente.
+}
+
+------------------------------------------------------------
+-- Vista previa Wikitext mediante MediaWiki
+------------------------------------------------------------
+
+surface VistaPreviaWikitext {
+    facing autor: luca/Autor
+    context documento: documento/Documento where formato = wikitext
+
+    exposes:
+        documento.contenido
+
+    @guarantee WikiExplicita
+        -- La interfaz identifica la wiki configurada y distingue inequívocamente
+        -- entre actualizando, respuesta actual, respuesta en caché, sin conexión
+        -- y error. Una respuesta cacheada nunca se presenta como actual.
+
+    @guarantee FuenteDisponibleSinConexion
+        -- Un fallo de red o de la wiki no impide editar ni guardar Wikitext.
+
+    @guarantee HTMLNoConfiable
+        -- El HTML devuelto se sanea antes de insertarlo. No puede ejecutar
+        -- scripts, formularios, manejadores, estilos ni interfaz privilegiada.
+
+    @guarantee SolicitudesAcotadas
+        -- Los cambios se agrupan, las solicitudes obsoletas se ignoran y cada
+        -- respuesta tiene límites de tiempo y tamaño.
+
+    @guarantee SinSesionImplicita
+        -- La preview no envía cookies ni reutiliza autenticación del navegador.
 }

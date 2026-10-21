@@ -7,5 +7,5 @@ Icon={{icon}}
 Name={{name}}
 Terminal=false
 Type=Application
-MimeType=text/markdown;
-Keywords=Markdown;Editor;Texto;Escritura;
+MimeType=text/markdown;text/x-wiki;
+Keywords=Markdown;Wikitext;MediaWiki;Editor;Texto;Escritura;

@@ -4,11 +4,15 @@
 
 # Luca
 
-Editor Markdown de escritorio
+Editor Markdown y Wikitext de escritorio
 </div>
 
-Luca es un editor de texto Markdown para macOS, Windows y Linux. Guarda
-archivos `.md` sin añadirles nada.
+Luca es un editor de texto Markdown y Wikitext para macOS, Windows y Linux.
+Guarda archivos `.md`, `.markdown`, `.wiki` y `.wikitext` sin añadirles nada.
+
+Consulta la **[Guía de uso](docs/uso.md)** para conocer los modos de edición,
+atajos, tablas, diagramas, preferencias y apertura desde el sistema o la línea
+de comandos.
 
 ## Descargar
 
@@ -41,6 +45,7 @@ xattr -cr /Applications/Luca.app
   ventana existente. Las pestañas se pueden arrastrar y reordenar.
 - Multiselección con ⌘D / Ctrl+D para añadir la siguiente aparición, disponible
   también en el menú Edición.
+- Formato por documento con detección por extensión y resaltado Wikitext.
 - Exportar a PDF.
 - Exportar e importar los tokens de diseño como JSON desde Preferencias.
 - Tipografía y colores configurables (`⌘,`), claro y oscuro.
@@ -73,6 +78,18 @@ cargo tauri dev
 - `.github/workflows/release.yml`: compila y publica los instaladores al etiquetar `vX.Y.Z`.
 
 Contribuciones: ver [CONTRIBUTING.md](CONTRIBUTING.md).
+Dependencias y licencias: ver [THIRD_PARTY.md](THIRD_PARTY.md).
+
+## Cambios por versión
+
+- **0.5.0:** instancia única, apertura múltiple y CLI; pestañas reordenables;
+  multiselección; edición por bloques también en vista dividida; enlaces web en
+  el navegador predeterminado; identidad pública e instaladores actualizados.
+- **0.4.2:** fuentes locales Source Serif 4 y Fira Code.
+- **0.4.1:** correcciones de pestañas y mejoras de presentación.
+
+El detalle verificable de cada comportamiento está en [`specs/`](specs/) y la
+dirección del producto en [`plan.md`](plan.md).
 
 ## Acerca de Luca
 

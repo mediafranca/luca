@@ -1,6 +1,4 @@
-// luca — Markdown + Mermaid, offline primero (vendor/), CDN de respaldo.
-// Patrón tomado de MarkChart: importar ESM, registrar motores de layout y
-// diagramas externos, y renderizar cada bloque con mermaid.render (que valida).
+// luca — Markdown + Mermaid con recursos locales.
 
 import { createMarkdownEditor } from "./vendor/codemirror/editor.js";
 import { createEditorToolbar, editDocumentTableAtIndex } from "./toolbar.js";
@@ -8,32 +6,43 @@ import { icon } from "./icons.js";
 import { beginBlockEdit, exitBlockEdit } from "./block-edit.js";
 import { externalWebUrl, isEditablePreviewMode, isInternalAnchor } from "./preview-behavior.js";
 import { moveByOffset, reorderById } from "./tab-order.js";
+import { extensionMismatch, interpretedFormat } from "./document-format.js";
+import DOMPurify from "./vendor/dompurify/purify.es.mjs";
+import { recentPaths, sessionSnapshot, validSession } from "./session-state.js";
+import { matchingCommands } from "./command-search.js";
+import { detectedLineEnding, documentHeadings } from "./document-outline.js";
 
-const LOCAL = "./vendor";
-const CDN = "https://cdn.jsdelivr.net/npm";
+let marked;
+let mermaid;
+let previewRuntimePromise;
 
-// Carga un módulo local; si falla (p.ej. vendor ausente), cae al CDN.
-async function load(localPath, cdnPath) {
-  try {
-    return await import(`${LOCAL}/${localPath}`);
-  } catch (e) {
-    console.warn(`luca: ${localPath} no disponible offline, usando CDN`, e);
-    return await import(`${CDN}/${cdnPath}`);
-  }
+function ensurePreviewRuntime() {
+  if (previewRuntimePromise) return previewRuntimePromise;
+  previewRuntimePromise = Promise.all([
+    import("./vendor/marked/marked.esm.js"),
+    import("./vendor/mermaid/mermaid.esm.min.mjs"),
+    import("./vendor/layout-elk/mermaid-layout-elk.esm.min.mjs"),
+    import("./vendor/tidy-tree/mermaid-layout-tidy-tree.esm.min.mjs"),
+    import("./vendor/zenuml/mermaid-zenuml.esm.min.mjs"),
+  ]).then(async ([markedMod, mermaidMod, elkMod, tidyMod, zenumlMod]) => {
+    marked = markedMod.marked;
+    mermaid = mermaidMod.default;
+    await mermaid.registerLayoutLoaders(elkMod.default);
+    await mermaid.registerLayoutLoaders(tidyMod.default);
+    await mermaid.registerExternalDiagrams([zenumlMod.default]);
+    marked.use({
+      renderer: {
+        code(code, lang) {
+          return lang === "mermaid"
+            ? `<pre class="mermaid">${code}</pre>`
+            : `<pre><code>${code.replace(/</g, "&lt;")}</code></pre>`;
+        },
+      },
+    });
+    initMermaid();
+  });
+  return previewRuntimePromise;
 }
-
-const [{ marked }, mermaidMod, elkMod, tidyMod, zenumlMod] = await Promise.all([
-  load("marked/marked.esm.js", "marked@12/lib/marked.esm.js"),
-  load("mermaid/mermaid.esm.min.mjs", "mermaid@12/dist/mermaid.esm.min.mjs"),
-  load("layout-elk/mermaid-layout-elk.esm.min.mjs", "@mermaid-js/layout-elk@1/dist/mermaid-layout-elk.esm.min.mjs"),
-  load("tidy-tree/mermaid-layout-tidy-tree.esm.min.mjs", "@mermaid-js/layout-tidy-tree@1/dist/mermaid-layout-tidy-tree.esm.mjs"),
-  load("zenuml/mermaid-zenuml.esm.min.mjs", "@mermaid-js/mermaid-zenuml@1/dist/mermaid-zenuml.esm.min.mjs"),
-]);
-
-const mermaid = mermaidMod.default;
-await mermaid.registerLayoutLoaders(elkMod.default);
-await mermaid.registerLayoutLoaders(tidyMod.default);
-await mermaid.registerExternalDiagrams([zenumlMod.default]);
 
 const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const mermaidTheme = () => { try { return localStorage.getItem("luca.mermaidTheme") || "vera"; } catch { return "vera"; } };
@@ -42,6 +51,7 @@ const mermaidTheme = () => { try { return localStorage.getItem("luca.mermaidThem
 // así el diagrama hereda la paleta de la app (claro/oscuro). El usuario puede
 // elegir otro preset desde Preferencias.
 function initMermaid() {
+  if (!mermaid) return;
   const base = { startOnLoad: false, securityLevel: "loose", maxTextSize: 10_000_000, maxEdges: 2000 };
   const choice = mermaidTheme();
   if (choice === "vera") {
@@ -75,17 +85,6 @@ function initMermaid() {
   }
 }
 
-// marked: los fences ```mermaid salen como <pre class="mermaid"> con el código crudo.
-marked.use({
-  renderer: {
-    code(code, lang) {
-      return lang === "mermaid"
-        ? `<pre class="mermaid">${code}</pre>`
-        : `<pre><code>${code.replace(/</g, "&lt;")}</code></pre>`;
-    },
-  },
-});
-
 // ---------- Multi-documento ----------
 // Cada documento tiene su propio editor y su propio preview; una apertura nueva
 // NO cierra ni reemplaza a los demás (contrato con Vera). El texto se guarda tal
@@ -100,6 +99,63 @@ let active = null;   // documento activo
 let seq = 0;         // ids de mermaid, únicos entre TODOS los documentos
 let nextId = 1;
 let draggedTabId = null;
+let restoringSession = false;
+let sessionTimer = null;
+
+const SESSION_KEY = "luca.session.v1";
+const RECENT_KEY = "luca.recentFiles";
+const readJsonStorage = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
+};
+function saveSessionSoon() {
+  if (restoringSession) return;
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(saveSessionNow, 120);
+}
+function saveSessionNow() {
+  if (restoringSession) return;
+  const snapshot = sessionSnapshot(docs.map((doc) => ({ ...doc, content: doc.ed.getDoc() })), active?.id);
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(snapshot)); } catch {}
+}
+function rememberRecent(path) {
+  if (!path) return;
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recentPaths(readJsonStorage(RECENT_KEY, []), path))); } catch {}
+  renderRecentFiles();
+}
+function renderRecentFiles() {
+  const select = document.getElementById("recentFiles");
+  if (!select) return;
+  const paths = readJsonStorage(RECENT_KEY, []);
+  select.replaceChildren(new Option("Recientes…", ""), ...paths.map((path) => new Option(baseName(path), path)));
+  for (const option of select.options) if (option.value) option.title = option.value;
+}
+
+const FORMAT_OVERRIDES_KEY = "luca.documentFormats";
+const NEW_FORMAT_KEY = "luca.newDocumentFormat";
+const readFormatOverrides = () => {
+  try { return JSON.parse(localStorage.getItem(FORMAT_OVERRIDES_KEY) || "{}"); } catch { return {}; }
+};
+const formatSelectionFor = (path) => path ? (readFormatOverrides()[path] || "auto") : "auto";
+const newDocumentFormat = () => {
+  try { return localStorage.getItem(NEW_FORMAT_KEY) || "markdown"; } catch { return "markdown"; }
+};
+const wikiApi = () => {
+  try { return localStorage.getItem("luca.wikiApi") || "https://wiki.ead.pucv.cl/api.php"; }
+  catch { return "https://wiki.ead.pucv.cl/api.php"; }
+};
+const wikiTitle = (doc) => {
+  try { return localStorage.getItem("luca.wikiTitle") || baseName(doc.path).replace(/\.[^.]+$/, "") || "Luca/Preview"; }
+  catch { return "Luca/Preview"; }
+};
+const rememberFormatSelection = (doc) => {
+  try {
+    if (!doc.path) return;
+    const values = readFormatOverrides();
+    if (doc.formatSelection === "auto") delete values[doc.path];
+    else values[doc.path] = doc.formatSelection;
+    localStorage.setItem(FORMAT_OVERRIDES_KEY, JSON.stringify(values));
+  } catch {}
+};
 
 // Una sola barra de herramientas, en la barra superior; opera sobre el
 // documento activo (el getter resuelve `doc.ed` en cada clic).
@@ -172,8 +228,59 @@ function renderBlocks(src) {
   return out.content;
 }
 
-async function renderDoc(doc) {
+async function renderDoc(doc, force = false) {
   if (doc.block) return;   // hay un bloque en edición: se renderiza al salir
+  if (!force && document.body.dataset.mode === "source") return;
+  const renderVersion = ++doc.renderVersion;
+  if (doc.format === "wikitext") {
+    const api = wikiApi();
+    const status = document.createElement("p");
+    status.className = "wiki-preview-status";
+    status.textContent = `Actualizando mediante ${api}…`;
+    doc.previewEl.replaceChildren(status);
+    if (!TAURI) {
+      status.textContent = `Preview Wikitext no disponible fuera de Tauri · ${api}`;
+      return;
+    }
+    try {
+      const html = await TAURI.core.invoke("parse_wikitext", { apiUrl: api, title: wikiTitle(doc), text: doc.ed.getDoc() });
+      if (renderVersion !== doc.renderVersion) return;
+      const clean = DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "meta", "link", "base"],
+        FORBID_ATTR: ["style", "srcset"],
+      });
+      const template = document.createElement("template");
+      template.innerHTML = clean;
+      const origin = new URL(api).origin;
+      for (const el of template.content.querySelectorAll("[href], [src]")) {
+        for (const attr of ["href", "src"]) {
+          const raw = el.getAttribute(attr);
+          if (!raw) continue;
+          try {
+            const resolved = new URL(raw, origin);
+            if (!["http:", "https:"].includes(resolved.protocol)) el.removeAttribute(attr);
+            else el.setAttribute(attr, resolved.href);
+          } catch { el.removeAttribute(attr); }
+        }
+      }
+      doc.wikiCache = template.innerHTML;
+      status.textContent = `Vista actual · ${api}`;
+      doc.previewEl.replaceChildren(status, template.content.cloneNode(true));
+    } catch (error) {
+      if (renderVersion !== doc.renderVersion) return;
+      status.textContent = `${navigator.onLine ? "Error" : "Sin conexión"} · ${api} · ${error}`;
+      if (doc.wikiCache) {
+        const cached = document.createElement("template");
+        cached.innerHTML = doc.wikiCache;
+        status.textContent += " · mostrando respuesta en caché";
+        doc.previewEl.replaceChildren(status, cached.content.cloneNode(true));
+      }
+    }
+    return;
+  }
+  await ensurePreviewRuntime();
+  if (renderVersion !== doc.renderVersion) return;
   doc.previewEl.replaceChildren(renderBlocks(doc.ed.getDoc()));
 
   // Resolver rutas relativas de imágenes y medios locales respecto al archivo abierto
@@ -193,6 +300,7 @@ async function renderDoc(doc) {
     const def = block.textContent;
     try {
       const { svg, bindFunctions } = await mermaid.render(`luca-d${seq++}`, def);
+      if (renderVersion !== doc.renderVersion) return;
       block.innerHTML = svg;
       bindFunctions?.(block);
     } catch (err) {
@@ -229,7 +337,10 @@ async function renderDoc(doc) {
 function onEdit(doc) {
   if (!doc.dirty) { doc.dirty = true; renderTabs(); if (doc === active) setTitle(); }
   clearTimeout(doc.t);
-  doc.t = setTimeout(() => renderDoc(doc), 150);
+  saveSessionSoon();
+  updateOutline(doc);
+  if (document.body.dataset.mode === "source") return;
+  doc.t = setTimeout(() => renderDoc(doc), doc.format === "wikitext" ? 650 : 150);
 }
 
 function renderTabs() {
@@ -295,6 +406,7 @@ function replaceTabOrder(next) {
   docs.splice(0, docs.length, ...next);
   renderTabs();
   tabsEl.querySelector('[aria-selected="true"]')?.focus();
+  saveSessionSoon();
 }
 
 function reorderTab(movedId, targetId, placement) {
@@ -311,10 +423,14 @@ function activate(doc) {
   for (const d of docs) { d.editorEl.hidden = d !== doc; d.previewEl.hidden = d !== doc; }
   renderTabs();
   setTitle();
+  updateFormatControls(doc);
+  updateOutline(doc);
+  updateCursorStatus(doc);
+  saveSessionSoon();
   doc.ed.focus();
 }
 
-function makeDoc(initialDoc, path) {
+function makeDoc(initialDoc, path, selection = null) {
   const editorEl = document.createElement("div");
   editorEl.className = "doc-editor";
   const cmMount = document.createElement("div");
@@ -325,6 +441,8 @@ function makeDoc(initialDoc, path) {
   editorsEl.append(editorEl);
   previewsEl.append(previewEl);
 
+  const formatSelection = selection ?? formatSelectionFor(path);
+  const fallback = path ? "markdown" : newDocumentFormat();
   const doc = {
     id: nextId++,
     path: path ?? null,
@@ -336,6 +454,11 @@ function makeDoc(initialDoc, path) {
     ed: null,
     t: null,
     block: null,   // bloque en edición en la vista renderizada (block-edit.js)
+    renderVersion: 0,
+    wikiCache: null,
+    lineEnding: detectedLineEnding(initialDoc),
+    formatSelection,
+    format: interpretedFormat(path, formatSelection, fallback),
   };
 
   doc.ed = createMarkdownEditor({
@@ -343,13 +466,15 @@ function makeDoc(initialDoc, path) {
     doc: initialDoc,
     dark: isCurrentDark(),
     onChange: () => onEdit(doc),
-    onCursor: () => syncPreview(doc),
+    onCursor: () => { syncPreview(doc); updateCursorStatus(doc); },
+    format: doc.format,
+    lineSeparator: doc.lineEnding === "CRLF" ? "\r\n" : doc.lineEnding === "CR" ? "\r" : "\n",
   });
   editorEl.append(cmMount);
 
   docs.push(doc);
   activate(doc);
-  renderDoc(doc);
+  if (document.body.dataset.mode !== "source") renderDoc(doc);
   return doc;
 }
 
@@ -361,19 +486,30 @@ async function openPath(path) {
   const content = await TAURI.core.invoke("read_file", { path });
   const doc = makeDoc(content, path);
   doc.lastMtime = await TAURI.core.invoke("stat", { path });
+  rememberRecent(path);
   return doc;
 }
 
 async function openFile() {
-  const path = await TAURI.dialog.open({ filters: [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }] });
+  const path = await TAURI.dialog.open({ filters: [{ name: "Texto marcado", extensions: ["md", "markdown", "wiki", "wikitext", "txt"] }] });
   if (typeof path === "string") await openPath(path);
 }
+
+document.getElementById("recentFiles")?.addEventListener("change", async (event) => {
+  const path = event.target.value;
+  event.target.value = "";
+  if (path && TAURI) {
+    try { await openPath(path); }
+    catch { alert(`No se pudo abrir el archivo reciente:\n${path}`); }
+  }
+});
 
 async function saveDoc(doc, forceDialog = false) {
   let path = doc.path;
   const isNew = forceDialog || !path;
   if (isNew) {
-    path = await TAURI.dialog.save({ defaultPath: doc.path ?? "sin título.md", filters: [{ name: "Markdown", extensions: ["md", "markdown"] }] });
+    const ext = doc.format === "wikitext" ? "wiki" : "md";
+    path = await TAURI.dialog.save({ defaultPath: doc.path ?? `sin título.${ext}`, filters: [{ name: "Texto marcado", extensions: ["md", "markdown", "wiki", "wikitext"] }] });
     if (!path) return;
   } else {
     // ¿cambió fuera de luca (p.ej. Vera) desde que lo leímos? No pisar en silencio.
@@ -383,10 +519,19 @@ async function saveDoc(doc, forceDialog = false) {
   }
   doc.lastMtime = await TAURI.core.invoke("write_file", { path, contents: doc.ed.getDoc() });
   doc.path = path; doc.dirty = false;
+  if (doc.formatSelection === "auto") {
+    doc.format = interpretedFormat(path, "auto", newDocumentFormat());
+    doc.ed.setFormat(doc.format);
+  }
+  rememberFormatSelection(doc);
+  rememberRecent(path);
   renderTabs(); if (doc === active) setTitle();
+  updateFormatControls(doc);
+  renderDoc(doc);
+  saveSessionSoon();
 }
 
-const newDoc = () => makeDoc("", null);
+const newDoc = () => makeDoc("", null, newDocumentFormat());
 
 function closeDoc(doc) {
   if (doc.dirty && !confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`)) return;
@@ -398,6 +543,7 @@ function closeDoc(doc) {
   if (docs.length === 0) { newDoc(); return; }   // siempre al menos un documento
   if (active === doc) activate(docs[Math.min(i, docs.length - 1)]);
   else renderTabs();
+  saveSessionSoon();
 }
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
@@ -409,9 +555,11 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
 addEventListener(
   "keydown",
   (e) => {
+    if (e.key === "F1") { e.preventDefault(); openShortcuts(); return; }
     if (!(e.metaKey || e.ctrlKey)) return;
     const k = e.key.toLowerCase();
-    if (k === "n") { e.preventDefault(); newDoc(); }
+    if (e.shiftKey && k === "p") { e.preventDefault(); openCommandPalette(); }
+    else if (k === "n") { e.preventDefault(); newDoc(); }
     else if (k === "w") { e.preventDefault(); if (active) closeDoc(active); }
     else if (e.shiftKey && k === "z") { e.preventDefault(); toggleZen(); }
     else if (e.key === "1") { e.preventDefault(); applyMode("source"); }
@@ -442,6 +590,8 @@ if (TAURI) {
     else if (id === "move_tab_right") { if (a) moveTab(a, 1); }
     else if (id === "about") openAbout();
     else if (id === "select_next_occurrence") { a?.ed.selectNextOccurrence(); }
+    else if (id === "command_palette") openCommandPalette();
+    else if (id === "shortcuts") openShortcuts();
   });
 }
 
@@ -471,6 +621,61 @@ dividerEl.addEventListener("dblclick", () => {
   try { localStorage.removeItem("luca.split"); } catch {}
 });
 
+// ---------- Formato por documento ----------
+const formatSelect = document.getElementById("documentFormat");
+const formatWarning = document.getElementById("formatWarning");
+const editorToolbar = document.querySelector(".editor-toolbar");
+const outlineSelect = document.getElementById("documentOutline");
+
+function updateCursorStatus(doc) {
+  if (!doc || doc !== active) return;
+  const location = doc.ed.getCursorLocation();
+  const cursor = document.getElementById("cursorStatus");
+  const encoding = document.getElementById("encodingStatus");
+  if (cursor) cursor.textContent = `Línea ${location.line}, columna ${location.column}`;
+  if (encoding) encoding.textContent = `UTF-8 · ${doc.lineEnding}`;
+}
+
+function updateOutline(doc) {
+  if (!outlineSelect || !doc || doc !== active) return;
+  const headings = documentHeadings(doc.ed.getDoc(), doc.format);
+  outlineSelect.replaceChildren(new Option(headings.length ? "Esquema…" : "Sin encabezados", ""), ...headings.map((heading) => {
+    const option = new Option(`${"· ".repeat(Math.max(0, heading.level - 1))}${heading.label}`, String(heading.offset));
+    option.title = heading.label;
+    return option;
+  }));
+}
+
+outlineSelect?.addEventListener("change", () => {
+  if (!active || outlineSelect.value === "") return;
+  active.ed.setSelection(Number(outlineSelect.value));
+  outlineSelect.value = "";
+});
+
+function updateFormatControls(doc) {
+  if (!doc || !formatSelect) return;
+  formatSelect.value = doc.formatSelection;
+  formatWarning.hidden = !extensionMismatch(doc.path, doc.formatSelection);
+  formatWarning.title = formatWarning.hidden ? "" : "El formato elegido no coincide con la extensión; se guardará sin convertir.";
+  if (editorToolbar) editorToolbar.hidden = doc.format === "wikitext";
+  document.body.dataset.format = doc.format;
+  updateOutline(doc);
+}
+
+formatSelect?.addEventListener("change", () => {
+  if (!active) return;
+  active.formatSelection = formatSelect.value;
+  active.format = interpretedFormat(active.path, active.formatSelection, newDocumentFormat());
+  active.ed.setFormat(active.format);
+  if (!active.path) {
+    try { localStorage.setItem(NEW_FORMAT_KEY, active.format); } catch {}
+  }
+  rememberFormatSelection(active);
+  updateFormatControls(active);
+  renderDoc(active);
+  saveSessionSoon();
+});
+
 // Lleva la vista previa al bloque donde está el cursor: sólo en split y para
 // el documento activo. Los bloques llevan data-line (ver renderBlocks).
 function syncPreview(doc) {
@@ -494,8 +699,81 @@ function applyMode(m) {
     b.classList.toggle("active", b.dataset.mode === m);
   try { localStorage.setItem("luca.mode", m); } catch {}
   if (active && !isEditablePreviewMode(m)) exitBlockEdit(active);
+  if (active && m !== "source") renderDoc(active);
   if (active) syncPreview(active);
 }
+
+const shortcutPrefix = navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+";
+const commandList = () => [
+  { label: "Nuevo documento", shortcut: `${shortcutPrefix}N`, run: newDoc },
+  { label: "Abrir archivo", shortcut: `${shortcutPrefix}O`, run: openFile },
+  { label: "Guardar", shortcut: `${shortcutPrefix}S`, run: () => active && saveDoc(active) },
+  { label: "Guardar como", shortcut: `${shortcutPrefix}Shift+S`, run: () => active && saveDoc(active, true) },
+  { label: "Cerrar pestaña", shortcut: `${shortcutPrefix}W`, run: () => active && closeDoc(active) },
+  { label: "Buscar y reemplazar", shortcut: `${shortcutPrefix}F`, run: () => active?.ed.openSearch() },
+  { label: "Seleccionar todas las apariciones", shortcut: `${shortcutPrefix}Shift+L`, run: () => active?.ed.selectAllMatches() },
+  { label: "Ir a línea", shortcut: `${shortcutPrefix}Alt+G`, run: () => active?.ed.gotoLine() },
+  { label: "Vista de código", shortcut: `${shortcutPrefix}1`, run: () => applyMode("source") },
+  { label: "Vista dividida", shortcut: `${shortcutPrefix}2`, run: () => applyMode("split") },
+  { label: "Texto renderizado", shortcut: `${shortcutPrefix}3`, run: () => applyMode("rendered") },
+  { label: "Modo zen", shortcut: `${shortcutPrefix}Shift+Z`, run: () => toggleZen() },
+  { label: "Preferencias", shortcut: `${shortcutPrefix},`, run: openPrefs },
+  { label: "Exportar PDF", shortcut: `${shortcutPrefix}E`, run: exportPdf },
+];
+
+const paletteEl = document.getElementById("commandPalette");
+const commandQuery = document.getElementById("commandQuery");
+const commandResults = document.getElementById("commandResults");
+const shortcutsEl = document.getElementById("shortcutsDialog");
+
+function renderCommandResults() {
+  const commands = matchingCommands(commandList(), commandQuery?.value || "");
+  commandResults?.replaceChildren(...commands.map((command) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "command-result";
+    const label = document.createElement("span");
+    label.textContent = command.label;
+    const shortcut = document.createElement("kbd");
+    shortcut.textContent = command.shortcut;
+    button.append(label, shortcut);
+    button.addEventListener("click", () => { paletteEl.hidden = true; command.run(); });
+    return button;
+  }));
+}
+
+function openCommandPalette() {
+  paletteEl.hidden = false;
+  commandQuery.value = "";
+  renderCommandResults();
+  commandQuery.focus();
+}
+
+function openShortcuts() {
+  const rows = document.getElementById("shortcutRows");
+  rows.replaceChildren(...commandList().map((command) => {
+    const row = document.createElement("tr");
+    const label = document.createElement("td");
+    const key = document.createElement("td");
+    label.textContent = command.label;
+    const kbd = document.createElement("kbd");
+    kbd.textContent = command.shortcut;
+    key.append(kbd);
+    row.append(label, key);
+    return row;
+  }));
+  shortcutsEl.hidden = false;
+}
+
+commandQuery?.addEventListener("input", renderCommandResults);
+commandQuery?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    commandResults.querySelector("button")?.click();
+  }
+});
+paletteEl?.addEventListener("click", (event) => { if (event.target === paletteEl) paletteEl.hidden = true; });
+shortcutsEl?.addEventListener("click", (event) => { if (event.target === shortcutsEl) shortcutsEl.hidden = true; });
 
 // La vista previa abre los enlaces web fuera de Luca. En los modos split y
 // rendered, pulsar cualquier otro bloque abre su Markdown in situ.
@@ -626,6 +904,7 @@ function initTopbarButtons() {
 // el diálogo de impresión de macOS ofrece «Guardar como PDF».
 // macOS imprime con márgenes reales desde Rust; el resto de plataformas usa el diálogo del webview.
 async function exportPdf() {
+  if (active) await renderDoc(active, true);
   // En macOS los márgenes los pone NSPrintInfo; @page se anula para que no se sumen.
   const st = document.createElement("style");
   st.textContent = "@page { margin:0 }";
@@ -829,6 +1108,8 @@ ${darkCSS}
 const prefsEl = document.getElementById("prefs");
 const aboutEl = document.getElementById("about");
 const mermaidSel = document.getElementById("mermaidTheme");
+const wikiApiInput = document.getElementById("wikiApi");
+const wikiTitleInput = document.getElementById("wikiTitle");
 const tokenFormGeneral = document.getElementById("tokenFormGeneral");
 const tokenFormLight = document.getElementById("tokenFormLight");
 const tokenFormDark = document.getElementById("tokenFormDark");
@@ -979,6 +1260,10 @@ document.querySelectorAll(".prefs-tab-btn").forEach((btn) => {
 
 function openPrefs() {
   if (mermaidSel) mermaidSel.value = mermaidTheme();
+  if (wikiApiInput) wikiApiInput.value = wikiApi();
+  if (wikiTitleInput) {
+    try { wikiTitleInput.value = localStorage.getItem("luca.wikiTitle") || ""; } catch {}
+  }
   buildTokenForms();
   if (prefsEl) prefsEl.hidden = false;
 }
@@ -1071,6 +1356,26 @@ if (prefsEl) {
     initMermaid();
     for (const d of docs) renderDoc(d);
   });
+  wikiApiInput?.addEventListener("change", () => {
+    const value = wikiApiInput.value.trim();
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:") throw new Error();
+      localStorage.setItem("luca.wikiApi", url.href);
+      for (const d of docs.filter((candidate) => candidate.format === "wikitext")) renderDoc(d);
+    } catch {
+      alert("La API de MediaWiki debe ser una URL HTTPS válida.");
+      wikiApiInput.value = wikiApi();
+    }
+  });
+  wikiTitleInput?.addEventListener("change", () => {
+    try {
+      const value = wikiTitleInput.value.trim();
+      if (value) localStorage.setItem("luca.wikiTitle", value);
+      else localStorage.removeItem("luca.wikiTitle");
+    } catch {}
+    for (const d of docs.filter((candidate) => candidate.format === "wikitext")) renderDoc(d);
+  });
 }
 
 // ⌘, abre Preferencias (macOS y web)
@@ -1087,6 +1392,8 @@ buildTokenForms();
 // Esc cierra preferencias si están abiertas, o sale del zen si está activo
 addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if (paletteEl && !paletteEl.hidden) { e.preventDefault(); paletteEl.hidden = true; return; }
+    if (shortcutsEl && !shortcutsEl.hidden) { e.preventDefault(); shortcutsEl.hidden = true; return; }
     if (prefsEl && !prefsEl.hidden) {
       e.preventDefault();
       e.stopPropagation();
@@ -1183,8 +1490,6 @@ flowchart LR
 - [ ] Paquetes de iconos vectoriales adicionales para diagramas
 `;
 
-initMermaid();
-
 // Esperar a que las fuentes carguen ANTES de montar el editor, para que
 // CodeMirror mida las líneas con Plex Mono y no queden desalineadas.
 if (document.fonts?.ready) { try { await document.fonts.ready; } catch {} }
@@ -1199,4 +1504,37 @@ async function drainLaunchRequest() {
   return pendingNew || Boolean(pending?.length);
 }
 
-if (!(await drainLaunchRequest())) makeDoc(SAMPLE, null);
+async function restorePreviousSession() {
+  const snapshot = readJsonStorage(SESSION_KEY, null);
+  if (!validSession(snapshot) || snapshot.documents.length === 0) return false;
+  restoringSession = true;
+  const restored = [];
+  for (const item of snapshot.documents) {
+    try {
+      let content = item.content;
+      if (content === null && item.path && TAURI) content = await TAURI.core.invoke("read_file", { path: item.path });
+      if (typeof content !== "string") continue;
+      const doc = makeDoc(content, item.path, item.formatSelection || "auto");
+      doc.dirty = Boolean(item.dirty && item.content !== null);
+      if (item.path && TAURI) doc.lastMtime = await TAURI.core.invoke("stat", { path: item.path });
+      restored.push(doc);
+    } catch {}
+  }
+  restoringSession = false;
+  if (!restored.length) return false;
+  activate(restored[Math.min(snapshot.activeIndex || 0, restored.length - 1)]);
+  renderTabs();
+  saveSessionSoon();
+  return true;
+}
+
+addEventListener("beforeunload", (event) => {
+  saveSessionNow();
+  if (docs.some((doc) => doc.dirty)) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
+renderRecentFiles();
+if (!(await drainLaunchRequest()) && !(await restorePreviousSession())) makeDoc(SAMPLE, null);

@@ -6,6 +6,84 @@ use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
+const MAX_WIKI_RESPONSE: u64 = 5 * 1024 * 1024;
+
+#[derive(serde::Deserialize)]
+struct ParseEnvelope {
+    parse: Option<ParseResult>,
+    error: Option<ApiError>,
+}
+
+#[derive(serde::Deserialize)]
+struct ParseResult {
+    text: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ApiError {
+    info: String,
+}
+
+#[tauri::command]
+async fn parse_wikitext(api_url: String, title: String, text: String) -> Result<String, String> {
+    let url = reqwest::Url::parse(&api_url).map_err(|_| "URL de wiki inválida".to_string())?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err("La API de la wiki debe usar HTTPS y no incluir credenciales".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() < 3 && attempt.url().scheme() == "https" {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
+        .user_agent(concat!("Luca/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .post(url)
+        .form(&[
+            ("action", "parse"),
+            ("format", "json"),
+            ("formatversion", "2"),
+            ("prop", "text"),
+            ("disableeditsection", "1"),
+            ("title", title.as_str()),
+            ("text", text.as_str()),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("No se pudo contactar la wiki: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("La wiki respondió HTTP {}", response.status()));
+    }
+    if response
+        .content_length()
+        .is_some_and(|n| n > MAX_WIKI_RESPONSE)
+    {
+        return Err("La respuesta de la wiki excede 5 MiB".into());
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > MAX_WIKI_RESPONSE {
+        return Err("La respuesta de la wiki excede 5 MiB".into());
+    }
+    let envelope: ParseEnvelope = serde_json::from_slice(&bytes)
+        .map_err(|_| "Respuesta inválida de MediaWiki".to_string())?;
+    if let Some(error) = envelope.error {
+        return Err(error.info);
+    }
+    envelope
+        .parse
+        .map(|parsed| parsed.text)
+        .ok_or_else(|| "MediaWiki no devolvió HTML".into())
+}
+
 // Analiza tanto aperturas iniciales como argumentos reenviados por la segunda
 // instancia. macOS además entrega asociaciones mediante RunEvent::Opened.
 mod file_argument;
@@ -191,8 +269,17 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .minimize()
         .build()?;
 
+    let ayuda = SubmenuBuilder::new(app, "Ayuda")
+        .item(&item(
+            "command_palette",
+            "Paleta de comandos…",
+            Some("CmdOrCtrl+Shift+P"),
+        )?)
+        .item(&item("shortcuts", "Atajos de teclado", Some("F1"))?)
+        .build()?;
+
     let menu = MenuBuilder::new(app)
-        .items(&[&app_menu, &archivo, &edicion, &vista, &ventana])
+        .items(&[&app_menu, &archivo, &edicion, &vista, &ventana, &ayuda])
         .build()?;
     app.set_menu(menu)?;
     Ok(())
@@ -203,7 +290,7 @@ fn main() {
     match file_argument::requested_information(startup_args.clone()) {
         Some("help") => {
             println!(
-                "Luca {}\n\nUso: luca [--new] [--] [archivo.md …]\n\n  --new          crea una pestaña vacía\n  -h, --help     muestra esta ayuda\n  -V, --version  muestra la versión",
+                "Luca {}\n\nUso: luca [--new] [--] [archivo …]\n\n  Admite .md, .markdown, .wiki y .wikitext.\n\n  --new          crea una pestaña vacía\n  -h, --help     muestra esta ayuda\n  -V, --version  muestra la versión",
                 env!("CARGO_PKG_VERSION")
             );
             return;
@@ -245,7 +332,8 @@ fn main() {
             stat,
             take_opened_files,
             take_new_document,
-            print_with_margins
+            print_with_margins,
+            parse_wikitext
         ])
         .setup(move |app| {
             *app.state::<Pending>().files.lock().unwrap() = startup_request.files.clone();

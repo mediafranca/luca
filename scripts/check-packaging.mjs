@@ -13,6 +13,11 @@ assert.equal(bundle.category, "Productivity");
 assert.match(bundle.shortDescription, /Markdown/i);
 assert.match(bundle.longDescription, /MediaFranca/);
 assert.equal(bundle.fileAssociations[0].mimeType, "text/markdown");
+assert.deepEqual(bundle.fileAssociations[0].ext, ["md", "markdown"]);
+assert.equal(bundle.fileAssociations[1].mimeType, "text/x-wiki");
+assert.deepEqual(bundle.fileAssociations[1].ext, ["wiki", "wikitext"]);
+assert.ok(existsSync(join(root, "node_modules", "dompurify", "dist", "purify.es.mjs")));
+assert.doesNotMatch(config.app.security.csp, /cdn\.jsdelivr\.net/);
 
 const expectedIcons = {
   "icons/32x32.png": [32, 32],
@@ -43,9 +48,9 @@ for (const contract of [
   "Exec={{exec}} %F",
   "StartupWMClass=luca",
   "Icon={{icon}}",
-  "MimeType=text/markdown;",
+  "MimeType=text/markdown;text/x-wiki;",
 ]) {
   assert.ok(desktop.includes(contract), "el lanzador Linux no contiene: " + contract);
 }
 
-console.log("packaging: iconos, metadatos y asociación Markdown verificados");
+console.log("packaging: iconos, metadatos y asociaciones Markdown/Wikitext verificados");

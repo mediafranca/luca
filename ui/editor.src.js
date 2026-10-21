@@ -8,8 +8,10 @@ import { EditorView, basicSetup, minimalSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { selectNextOccurrence } from "@codemirror/search";
+import { gotoLine, openSearchPanel, selectMatches, selectNextOccurrence } from "@codemirror/search";
 import { tags as t } from "@lezer/highlight";
+import { mediawikiLanguage } from "@bhsd/codemirror-wikitext";
+import mediawikiConfig from "wikiparser-node/config/default.json" with { type: "json" };
 
 // Tamaño e interlínea del código salen del token --code-size (Preferencias).
 // La interlínea se deriva del tamaño, no de la métrica de la fuente: cada línea
@@ -75,15 +77,20 @@ const blockHighlight = HighlightStyle.define([
 const themeFor = (dark, block) =>
   block ? [blockTheme, syntaxHighlighting(blockHighlight)] : [editorTheme(dark), syntaxHighlighting(highlight)];
 
-export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, block = false }) {
+const languageFor = (format) =>
+  format === "wikitext" ? mediawikiLanguage(mediawikiConfig) : markdown({ base: markdownLanguage });
+
+export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, block = false, format = "markdown", lineSeparator = "\n" }) {
   const themeComp = new Compartment();
+  const languageComp = new Compartment();
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc,
       extensions: [
         block ? minimalSetup : basicSetup,
-        markdown({ base: markdownLanguage }),
+        languageComp.of(languageFor(block ? "markdown" : format)),
+        EditorState.lineSeparator.of(lineSeparator),
         EditorView.lineWrapping,
         themeComp.of(themeFor(dark, block)),
         EditorView.updateListener.of((u) => {
@@ -104,6 +111,7 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
     setDoc: (text) =>
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
     setDark: (d) => view.dispatch({ effects: themeComp.reconfigure(themeFor(d, block)) }),
+    setFormat: (next) => view.dispatch({ effects: languageComp.reconfigure(languageFor(block ? "markdown" : next)) }),
     destroy: () => view.destroy(),
     remeasure: () => view.requestMeasure(),
     focus: () => view.focus(),
@@ -111,6 +119,9 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
       selectNextOccurrence(view);
       view.focus();
     },
+    openSearch: () => { openSearchPanel(view); view.focus(); },
+    gotoLine: () => { gotoLine(view); view.focus(); },
+    selectAllMatches: () => { selectMatches(view); view.focus(); },
     getView: () => view,
     getSelection: () => {
       const sel = view.state.selection.main;
@@ -149,6 +160,11 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
     },
     getCursor: () => view.state.selection.main.head,
     getCursorLine: () => view.state.doc.lineAt(view.state.selection.main.head).number,
+    getCursorLocation: () => {
+      const position = view.state.selection.main.head;
+      const line = view.state.doc.lineAt(position);
+      return { line: line.number, column: position - line.from + 1 };
+    },
     getLineAt: (pos) => view.state.doc.lineAt(pos),
   };
 }

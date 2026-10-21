@@ -1,5 +1,4 @@
 /src-tauri/target/
 node_modules/
 /ui/vendor/
-package-lock.json
 .DS_Store

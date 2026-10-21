@@ -15,17 +15,27 @@
 use "./luca.allium" as luca
 
 ------------------------------------------------------------
+-- Formatos
+------------------------------------------------------------
+
+enum FormatoDocumento { markdown | wikitext }
+enum SeleccionFormato { automatico | markdown | wikitext }
+
+------------------------------------------------------------
 -- Documento y Espacio
 ------------------------------------------------------------
 
 entity Documento {
-    -- Un .md abierto en una pestaña. Conserva su propia ruta y estado.
+    -- Un archivo de texto abierto en una pestaña. Conserva su propia ruta,
+    -- formato supuesto y estado.
     espacio: Espacio
     ruta: String?                   -- null mientras no se ha guardado
     contenido: String               -- el texto, tal cual lo escribe el Autor
     sucio: Boolean                  -- hay cambios sin guardar
     mtime_observado: Timestamp?     -- mtime del archivo cuando se leyó/guardó
     activo: Boolean                 -- es la pestaña visible
+    seleccion_formato: SeleccionFormato
+    formato: FormatoDocumento
 }
 
 entity Espacio {
@@ -80,7 +90,9 @@ rule AbrirArchivo {
                 contenido: archivo.contenido,
                 sucio: false,
                 mtime_observado: archivo.mtime,
-                activo: true
+                activo: true,
+                seleccion_formato: seleccion_guardada(archivo.ruta) ?? automatico,
+                formato: formato_interpretado(archivo.ruta, seleccion_guardada(archivo.ruta) ?? automatico)
             )
             for existente in espacio.documentos:
                 existente.activo = false
@@ -100,7 +112,9 @@ rule NuevoDocumento {
             ruta: null,
             contenido: "",
             sucio: false,
-            activo: true
+            activo: true,
+            seleccion_formato: preferencia_formato_nuevo(),
+            formato: formato_interpretado(null, preferencia_formato_nuevo())
         )
         for existente in espacio.documentos:
             existente.activo = false
@@ -117,6 +131,23 @@ rule EditarContenido {
     ensures:
         documento.contenido = texto_nuevo
         documento.sucio = true
+}
+
+rule CambiarFormato {
+    -- Cambiar de formato sólo cambia interpretación, resaltado y comandos.
+    when: AutorCambiaFormato(documento, seleccion)
+
+    ensures:
+        documento.seleccion_formato = seleccion
+        documento.formato = formato_interpretado(documento.ruta, seleccion)
+
+    @guarantee NoConvierteContenido
+        -- El contenido no se convierte, normaliza ni reescribe al cambiar de
+        -- Markdown a Wikitext, de Wikitext a Markdown o a modo automático.
+
+    @guarantee OverrideFueraDelArchivo
+        -- En documentos con ruta, la selección explícita se recuerda por ruta
+        -- en el estado local de luca y nunca se inserta dentro del archivo.
 }
 
 ------------------------------------------------------------
@@ -149,6 +180,8 @@ rule GuardarComo {
 
     ensures:
         documento.ruta = ruta_nueva
+        if documento.seleccion_formato = automatico:
+            documento.formato = formato_interpretado(ruta_nueva, automatico)
         documento.sucio = false
         documento.mtime_observado = now
 
@@ -175,7 +208,9 @@ rule CerrarDocumento {
                 ruta: null,
                 contenido: "",
                 sucio: false,
-                activo: true
+                activo: true,
+                seleccion_formato: preferencia_formato_nuevo(),
+                formato: formato_interpretado(null, preferencia_formato_nuevo())
             )
 
     @guarantee ConfirmaDescarte

@@ -1,11 +1,17 @@
 {
   "name": "luca",
   "version": "0.5.0",
-  "description": "Editor Markdown mínimo y rápido, con Mermaid offline.",
+  "description": "Editor local de Markdown y Wikitext, mínimo y rápido.",
   "private": true,
   "type": "module",
-  "author": { "name": "Herbert Spencer González", "url": "https://github.com/hspencer" },
-  "repository": { "type": "git", "url": "https://github.com/mediafranca/luca" },
+  "author": {
+    "name": "Herbert Spencer González",
+    "url": "https://github.com/hspencer"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mediafranca/luca"
+  },
   "license": "EUPL-1.2",
   "scripts": {
     "test": "node --test tests/*.test.mjs && node scripts/check-packaging.mjs",
@@ -13,12 +19,14 @@
     "build:editor": "esbuild ui/editor.src.js --outfile=ui/vendor/codemirror/editor.js --bundle --format=esm --minify"
   },
   "dependencies": {
+    "@bhsd/codemirror-wikitext": "^0.12.1",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/theme-one-dark": "^6.1.3",
     "@mermaid-js/layout-elk": "^1.0.1",
     "@mermaid-js/layout-tidy-tree": "^1.0.1",
     "@mermaid-js/mermaid-zenuml": "^1.0.1",
     "codemirror": "^6.0.2",
+    "dompurify": "^3.4.17",
     "marked": "^12.0.2",
     "mermaid": "^12.2.0"
   },

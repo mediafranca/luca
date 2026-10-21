@@ -48,9 +48,9 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # package-lock.json no se versiona: install, no ci. El hook beforeBuildCommand
-      # de Tauri ejecuta `npm run vendor` (empaqueta CodeMirror y copia mermaid/marked).
-      - run: npm install
+      # El hook beforeBuildCommand de Tauri ejecuta `npm run vendor`
+      # (empaqueta CodeMirror y copia mermaid/marked).
+      - run: npm ci
 
       - name: Verificar comportamiento y empaquetado
         run: npm test

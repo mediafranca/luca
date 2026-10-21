@@ -1,9 +1,9 @@
 -- allium: 3
 -- luca.allium — módulo raíz
 --
--- luca: el editor Markdown de Vera, parte del ecosistema Media Franca. Un
--- editor sencillo y rápido para elaborar el texto de una página antes de
--- publicarla en Vera, con vista previa en vivo y diagramas Mermaid.
+-- luca: editor local de Markdown y Wikitext de MediaFranca. Un editor sencillo
+-- y rápido para elaborar texto marcado legible, con vista previa Markdown en
+-- vivo y diagramas Mermaid.
 --
 -- Scope: el comportamiento observable del editor — abrir, editar, guardar y
 -- cerrar archivos .md en varias pestañas, la vista previa (Markdown + Mermaid)
