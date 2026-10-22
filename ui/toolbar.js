@@ -4,11 +4,28 @@
 import { icon } from "./icons.js";
 import { readMarkdownTable, newMarkdownTable } from "./markdown-table.js";
 import { openTableEditorModal } from "./table-editor.js";
+import {
+  codeBlock,
+  formatLabel,
+  headingLine,
+  headingMarker,
+  inlineMarkers,
+  linkSnippet,
+  normalizeFormat,
+  supportsLineAction,
+  toggleInline,
+  toggledLine,
+} from "./format-syntax.js";
+import { isWikitextTableClose, isWikitextTableOpen, readWikitextTable } from "./wikitext-table.js";
 
 /**
- * Crea y conecta la barra de herramientas para un documento activo.
+ * Crea y conecta la barra de herramientas para un documento activo. `doc.ed`
+ * y `doc.format` se leen en cada clic, así la barra emite Markdown o Wikitext
+ * según el documento activo; `bar.refresh(format)` actualiza ayudas y botones
+ * sin equivalente en el formato.
  */
 export function createEditorToolbar(doc, onTableEdit) {
+  const format = () => normalizeFormat(doc.format);
   const bar = document.createElement("div");
   bar.className = "editor-toolbar";
   bar.setAttribute("role", "toolbar");
@@ -52,14 +69,14 @@ export function createEditorToolbar(doc, onTableEdit) {
     const ed = doc.ed;
     const cursor = ed.getCursor();
     const line = ed.getLineAt(cursor);
-    const stripped = line.text.replace(/^#{1,6}\s+/, "");
-    const newText = level > 0 ? `${"#".repeat(level)} ${stripped}` : stripped;
+    const newText = headingLine(format(), level, line.text);
     ed.replaceRange(newText, line.from, line.to);
     ed.setSelection(line.from + newText.length);
     ed.focus();
   };
 
   const h1Btn = textButton("H₁", "Encabezado nivel 1 (#)", () => applyHeading(1), "toolbar-h-main");
+  h1Btn.dataset.heading = "1";
   const headingToggle = document.createElement("button");
   headingToggle.type = "button";
   headingToggle.className = "toolbar-action toolbar-heading-toggle";
@@ -104,13 +121,14 @@ export function createEditorToolbar(doc, onTableEdit) {
     menu.style.left = `${rect.left}px`;
     menu.style.zIndex = "1000";
 
+    const mark = (level) => headingMarker(format(), level);
     const levels = [
-      { label: "H₁", level: 1, title: "Título principal (#)" },
-      { label: "H₂", level: 2, title: "Sección (##)" },
-      { label: "H₃", level: 3, title: "Subsección (###)" },
-      { label: "H₄", level: 4, title: "Nivel 4 (####)" },
-      { label: "H₅", level: 5, title: "Nivel 5 (#####)" },
-      { label: "H₆", level: 6, title: "Nivel 6 (######)" },
+      { label: "H₁", level: 1, title: `Título principal (${mark(1)})` },
+      { label: "H₂", level: 2, title: `Sección (${mark(2)})` },
+      { label: "H₃", level: 3, title: `Subsección (${mark(3)})` },
+      { label: "H₄", level: 4, title: `Nivel 4 (${mark(4)})` },
+      { label: "H₅", level: 5, title: `Nivel 5 (${mark(5)})` },
+      { label: "H₆", level: 6, title: `Nivel 6 (${mark(6)})` },
       { label: "P", level: 0, title: "Párrafo normal (sin encabezado)" },
     ];
 
@@ -139,61 +157,46 @@ export function createEditorToolbar(doc, onTableEdit) {
   const formatGroup = document.createElement("div");
   formatGroup.className = "toolbar-group toolbar-inline-format";
 
-  const applyInline = (marker) => {
+  const applyInline = (kind) => {
     const ed = doc.ed;
+    const [open, close] = inlineMarkers(format(), kind);
     const sel = ed.getSelection();
-    const w = marker.length;
     if (sel.empty) {
-      ed.replaceSelection(`${marker}${marker}`);
-      ed.setSelection(sel.from + w);
+      ed.replaceSelection(`${open}${close}`);
+      ed.setSelection(sel.from + open.length);
       return;
     }
-    if (sel.text.startsWith(marker) && sel.text.endsWith(marker) && sel.text.length >= w * 2) {
-      const inner = sel.text.slice(w, -w);
-      ed.replaceSelection(inner);
-      ed.setSelection(sel.from, sel.from + inner.length);
-      return;
-    }
-    const fullDoc = ed.getDoc();
-    if (
-      sel.from >= w &&
-      fullDoc.slice(sel.from - w, sel.from) === marker &&
-      fullDoc.slice(sel.to, sel.to + w) === marker
-    ) {
-      ed.replaceRange(sel.text, sel.from - w, sel.to + w);
-      ed.setSelection(sel.from - w, sel.from - w + sel.text.length);
-      return;
-    }
-    ed.replaceSelection(`${marker}${sel.text}${marker}`);
-    ed.setSelection(sel.from + w, sel.to + w);
+    const result = toggleInline(ed.getDoc(), sel.from, sel.to, open, close);
+    ed.replaceRange(result.insert, result.from, result.to);
+    ed.setSelection(result.selectionStart, result.selectionEnd);
+  };
+
+  const inlineButton = (kind, iconName, label, extraClass = "") => {
+    const btn = actionButton(iconName, label, () => applyInline(kind), extraClass);
+    btn.dataset.inline = kind;
+    btn.dataset.label = label;
+    return btn;
   };
 
   formatGroup.append(
-    actionButton("bold", "Negrita (**texto**)", () => applyInline("**")),
-    actionButton("italic", "Cursiva (*texto*)", () => applyInline("*"), "format-italic"),
-    actionButton("strikethrough", "Tachado (~~texto~~)", () => applyInline("~~"), "format-strike"),
-    actionButton("underline", "Subrayado (++texto++)", () => applyInline("++"), "format-underline"),
-    actionButton("superscript", "Superíndice (^texto^)", () => applyInline("^")),
-    actionButton("subscript", "Subíndice (~texto~)", () => applyInline("~")),
-    actionButton("code", "Código en línea (`código`)", () => applyInline("`"))
+    inlineButton("bold", "bold", "Negrita"),
+    inlineButton("italic", "italic", "Cursiva", "format-italic"),
+    inlineButton("strikethrough", "strikethrough", "Tachado", "format-strike"),
+    inlineButton("underline", "underline", "Subrayado", "format-underline"),
+    inlineButton("superscript", "superscript", "Superíndice"),
+    inlineButton("subscript", "subscript", "Subíndice"),
+    inlineButton("code", "code", "Código en línea")
   );
 
   // 3. Grupo de bloques y listas
   const blockGroup = document.createElement("div");
   blockGroup.className = "toolbar-group toolbar-blocks";
 
-  const toggleLinePrefix = (prefix) => {
+  const toggleLinePrefix = (kind) => {
     const ed = doc.ed;
     const cursor = ed.getCursor();
     const line = ed.getLineAt(cursor);
-    let newText;
-    if (line.text.startsWith(prefix)) {
-      newText = line.text.slice(prefix.length);
-    } else {
-      // Reemplaza otros prefijos de lista si existen
-      const clean = line.text.replace(/^(\s*[-*+]\s*|\s*\d+\.\s*|\s*>\s*|\s*-\s*\[[ xX]\]\s*)/, "");
-      newText = `${prefix}${clean}`;
-    }
+    const newText = toggledLine(format(), kind, line.text);
     ed.replaceRange(newText, line.from, line.to);
     ed.setSelection(line.from + newText.length);
   };
@@ -201,21 +204,26 @@ export function createEditorToolbar(doc, onTableEdit) {
   const insertCodeBlock = () => {
     const ed = doc.ed;
     const sel = ed.getSelection();
-    if (sel.empty) {
-      ed.replaceSelection("```\n\n```\n");
-      ed.setSelection(sel.from + 4);
-    } else {
-      ed.replaceSelection(`\`\`\`\n${sel.text}\n\`\`\`\n`);
-      ed.setSelection(sel.from + 4, sel.from + 4 + sel.text.length);
-    }
+    const block = codeBlock(format(), sel.empty ? "" : sel.text);
+    ed.replaceSelection(block.insert);
+    ed.setSelection(sel.from + block.selectionStart, sel.from + block.selectionEnd);
   };
 
+  const lineButton = (kind, iconName, label) => {
+    const btn = actionButton(iconName, label, () => toggleLinePrefix(kind));
+    btn.dataset.line = kind;
+    btn.dataset.label = label;
+    return btn;
+  };
+
+  const codeBlockBtn = actionButton("code-block", "Bloque de código", insertCodeBlock);
+  codeBlockBtn.dataset.block = "code";
   blockGroup.append(
-    actionButton("quote", "Cita (> bloque)", () => toggleLinePrefix("> ")),
-    actionButton("list", "Lista con viñetas (- elemento)", () => toggleLinePrefix("- ")),
-    actionButton("list-numbers", "Lista numerada (1. elemento)", () => toggleLinePrefix("1. ")),
-    actionButton("list-check", "Lista de tareas (- [ ] tarea)", () => toggleLinePrefix("- [ ] ")),
-    actionButton("code-block", "Bloque de código (```)", insertCodeBlock)
+    lineButton("quote", "quote", "Cita"),
+    lineButton("bullet", "list", "Lista con viñetas"),
+    lineButton("numbered", "list-numbers", "Lista numerada"),
+    lineButton("task", "list-check", "Lista de tareas"),
+    codeBlockBtn
   );
 
   // 4. Grupo de enlaces y tablas
@@ -225,32 +233,53 @@ export function createEditorToolbar(doc, onTableEdit) {
   const insertLink = (isInternal) => {
     const ed = doc.ed;
     const sel = ed.getSelection();
-    if (isInternal) {
-      if (sel.empty) {
-        ed.replaceSelection("[[]]");
-        ed.setSelection(sel.from + 2);
-      } else {
-        ed.replaceSelection(`[[${sel.text}]]`);
-        ed.setSelection(sel.from + 2, sel.from + 2 + sel.text.length);
-      }
-    } else {
-      if (sel.empty) {
-        ed.replaceSelection("[texto](https://)");
-        ed.setSelection(sel.from + 1, sel.from + 6);
-      } else {
-        ed.replaceSelection(`[${sel.text}](https://)`);
-        ed.setSelection(sel.from + sel.text.length + 3, sel.from + sel.text.length + 11);
-      }
+    const link = linkSnippet(format(), isInternal ? "internal" : "external", sel.empty ? "" : sel.text);
+    ed.replaceSelection(link.insert);
+    ed.setSelection(sel.from + link.selectionStart, sel.from + link.selectionEnd);
+  };
+
+  // Bloque `{| … |}` que contiene la línea del cursor, o null.
+  const wikitextTableAround = (ed, curLine) => {
+    const fullText = ed.getDoc();
+    let startLine = curLine;
+    while (!isWikitextTableOpen(startLine.text)) {
+      if (isWikitextTableClose(startLine.text) && startLine !== curLine) return null;
+      if (startLine.number <= 1) return null;
+      startLine = ed.getLineAt(startLine.from - 1);
     }
+    let endLine = curLine;
+    while (!isWikitextTableClose(endLine.text)) {
+      if (endLine.to >= fullText.length) return null;
+      endLine = ed.getLineAt(endLine.to + 1);
+      if (isWikitextTableOpen(endLine.text)) return null;
+    }
+    return { from: startLine.from, to: endLine.to, text: fullText.slice(startLine.from, endLine.to) };
   };
 
   const handleTableButton = () => {
     const ed = doc.ed;
     const cursor = ed.getCursor();
     const curLine = ed.getLineAt(cursor);
+    const currentFormat = format();
+
+    if (currentFormat === "wikitext") {
+      const block = wikitextTableAround(ed, curLine);
+      const parsed = block ? readWikitextTable(block.text) : null;
+      if (block && parsed) {
+        openTableEditorModal({
+          table: parsed,
+          format: currentFormat,
+          onSave: (updated, serialized) => {
+            ed.replaceRange(serialized, block.from, block.to);
+            ed.setSelection(block.from + serialized.length);
+          },
+        });
+        return;
+      }
+    }
 
     // ¿El cursor está dentro de una tabla Markdown existente?
-    if (curLine.text.trim().startsWith("|") && curLine.text.trim().endsWith("|")) {
+    if (currentFormat === "markdown" && curLine.text.trim().startsWith("|") && curLine.text.trim().endsWith("|")) {
       const fullText = ed.getDoc();
       let startLine = curLine;
       let endLine = curLine;
@@ -293,6 +322,7 @@ export function createEditorToolbar(doc, onTableEdit) {
     // No está en tabla: crear tabla nueva
     openTableEditorModal({
       table: newMarkdownTable(3, 3, "row"),
+      format: currentFormat,
       onSave: (updated, serialized) => {
         const prefix = curLine.text.trim() === "" ? "" : "\n\n";
         const suffix = "\n";
@@ -301,13 +331,38 @@ export function createEditorToolbar(doc, onTableEdit) {
     });
   };
 
+  const linkBtn = actionButton("link", "Enlace externo", () => insertLink(false));
+  linkBtn.dataset.link = "external";
+  const tableBtn = actionButton("grid", "Editor de tabla", handleTableButton, "toolbar-table-btn");
   linksGroup.append(
-    actionButton("link", "Enlace Markdown ([texto](url))", () => insertLink(false)),
+    linkBtn,
     actionButton("brackets", "Enlace interno ([[página]])", () => insertLink(true)),
-    actionButton("grid", "Editor de tabla Markdown (▦)", handleTableButton, "toolbar-table-btn")
+    tableBtn
   );
 
   bar.append(headingGroup, formatGroup, blockGroup, linksGroup);
+
+  // Ayudas y disponibilidad de cada botón según el formato del documento activo.
+  const setTitle = (btn, title) => { btn.title = title; btn.setAttribute("aria-label", title); };
+  bar.refresh = (nextFormat) => {
+    const f = normalizeFormat(nextFormat);
+    bar.dataset.format = f;
+    setTitle(h1Btn, `Encabezado nivel 1 (${headingMarker(f, 1)})`);
+    for (const btn of bar.querySelectorAll("[data-inline]")) {
+      const [open, close] = inlineMarkers(f, btn.dataset.inline);
+      setTitle(btn, `${btn.dataset.label} (${open}texto${close})`);
+    }
+    for (const btn of bar.querySelectorAll("[data-line]")) {
+      const kind = btn.dataset.line;
+      btn.hidden = !supportsLineAction(f, kind);
+      const sample = toggledLine(f, kind, kind === "quote" ? "bloque" : kind === "task" ? "tarea" : "elemento");
+      setTitle(btn, `${btn.dataset.label} (${sample})`);
+    }
+    setTitle(codeBlockBtn, f === "wikitext" ? "Bloque de código (<pre>)" : "Bloque de código (```)");
+    setTitle(linkBtn, f === "wikitext" ? "Enlace externo ([url texto])" : "Enlace Markdown ([texto](url))");
+    setTitle(tableBtn, `Editor de tabla ${formatLabel(f)} (▦)`);
+  };
+  bar.refresh(format());
   return bar;
 }
 

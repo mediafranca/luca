@@ -184,7 +184,10 @@ const rememberFormatSelection = (doc) => {
 
 // Una sola barra de herramientas, en la barra superior; opera sobre el
 // documento activo (el getter resuelve `doc.ed` en cada clic).
-document.getElementById("modes").after(createEditorToolbar({ get ed() { return active?.block?.ed ?? active?.ed; } }));
+document.getElementById("modes").after(createEditorToolbar({
+  get ed() { return active?.block?.ed ?? active?.ed; },
+  get format() { return active?.format ?? "markdown"; },
+}));
 
 const dark = () => isCurrentDark();
 const baseName = (p) => (p ? p.split(/[\\/]/).pop() : "sin título");
@@ -776,7 +779,8 @@ function updateFormatControls(doc) {
   formatSelect.value = doc.formatSelection;
   formatWarning.hidden = !extensionMismatch(doc.path, doc.formatSelection);
   formatWarning.title = formatWarning.hidden ? "" : "El formato elegido no coincide con la extensión; se guardará sin convertir.";
-  if (editorToolbar) editorToolbar.hidden = doc.format === "wikitext";
+  // La barra no se oculta en Wikitext: adapta su marcado al formato del documento.
+  if (editorToolbar) { editorToolbar.hidden = false; editorToolbar.refresh?.(doc.format); }
   document.body.dataset.format = doc.format;
   updateOutline(doc);
 }

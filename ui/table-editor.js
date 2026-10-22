@@ -10,43 +10,22 @@ import {
   tabularClipboard,
   writeMarkdownTable,
 } from "./markdown-table.js";
+import { writeWikitextTable } from "./wikitext-table.js";
+import { formatLabel, inlineMarkers, linkSnippet, normalizeFormat, toggleInline } from "./format-syntax.js";
 
-function resolveCellFormat(marker, text, start, end) {
-  const width = marker.length;
-  const selected = text.slice(start, end);
-  if (
-    start >= width &&
-    text.slice(start - width, start) === marker &&
-    text.slice(end, end + width) === marker
-  ) {
-    return {
-      buffer: text.slice(0, start - width) + selected + text.slice(end + width),
-      selectionStart: start - width,
-      selectionEnd: end - width,
-    };
-  }
-  if (selected.length >= width * 2 && selected.startsWith(marker) && selected.endsWith(marker)) {
-    const inner = selected.slice(width, -width);
-    return {
-      buffer: text.slice(0, start) + inner + text.slice(end),
-      selectionStart: start,
-      selectionEnd: end - width * 2,
-    };
-  }
-  return {
-    buffer: text.slice(0, start) + marker + selected + marker + text.slice(end),
-    selectionStart: start + width,
-    selectionEnd: end + width,
-  };
+// El marcado de celda (negrita, cursiva, código, enlace) sigue al formato del
+// documento: Markdown o Wikitext.
+function resolveCellFormat(format, kind, text, start, end) {
+  const [open, close] = inlineMarkers(format, kind);
+  return toggleInline(text, start, end, open, close);
 }
 
-function resolveCellLink(text, start, end) {
-  const selected = text.slice(start, end) || "texto";
-  const written = `[${selected}](https://)`;
+function resolveCellLink(format, text, start, end) {
+  const link = linkSnippet(format, "external", text.slice(start, end));
   return {
-    buffer: text.slice(0, start) + written + text.slice(end),
-    selectionStart: start + 1,
-    selectionEnd: start + 1 + selected.length,
+    buffer: text.slice(0, start) + link.insert + text.slice(end),
+    selectionStart: start + link.selectionStart,
+    selectionEnd: start + link.selectionEnd,
   };
 }
 
@@ -67,6 +46,7 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
   };
   let activeInput = null;
   let dirty = false;
+  const format = normalizeFormat(options.format);
 
   const rowAt = (r) => (r === 0 ? table.header : table.rows[r - 1]);
 
@@ -147,19 +127,19 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
     // Grupo de formato
     const format = document.createElement("div");
     format.className = "table-editor-tool-group";
-    const formatWith = (marker) => {
+    const formatWith = (kind) => {
       if (!activeInput) return;
       applyOutcome(
-        resolveCellFormat(marker, activeInput.value, activeInput.selectionStart ?? 0, activeInput.selectionEnd ?? activeInput.value.length)
+        resolveCellFormat(format, kind, activeInput.value, activeInput.selectionStart ?? 0, activeInput.selectionEnd ?? activeInput.value.length)
       );
     };
     format.append(
-      button("bold", "Negrita en celda (⌘B)", () => formatWith("**")),
-      button("italic", "Cursiva en celda (⌘I)", () => formatWith("*")),
-      button("code", "Código en celda", () => formatWith("`")),
+      button("bold", "Negrita en celda (⌘B)", () => formatWith("bold")),
+      button("italic", "Cursiva en celda (⌘I)", () => formatWith("italic")),
+      button("code", "Código en celda", () => formatWith("code")),
       button("link", "Enlace en celda (⌘K)", () => {
         if (!activeInput) return;
-        applyOutcome(resolveCellLink(activeInput.value, activeInput.selectionStart ?? 0, activeInput.selectionEnd ?? activeInput.value.length));
+        applyOutcome(resolveCellLink(format, activeInput.value, activeInput.selectionStart ?? 0, activeInput.selectionEnd ?? activeInput.value.length));
       })
     );
 
@@ -302,10 +282,10 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
 
         input.addEventListener("keydown", (e) => {
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
-            e.preventDefault(); formatWith("**"); return;
+            e.preventDefault(); formatWith("bold"); return;
           }
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
-            e.preventDefault(); formatWith("*"); return;
+            e.preventDefault(); formatWith("italic"); return;
           }
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
             e.preventDefault();
@@ -392,7 +372,7 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
 /**
  * Abre el editor de tablas en un modal dedicado accesible y centrado.
  */
-export function openTableEditorModal({ table, onSave, onCancel }) {
+export function openTableEditorModal({ table, onSave, onCancel, format = "markdown" }) {
   let modal = document.getElementById("tableModal");
   if (!modal) {
     modal = document.createElement("div");
@@ -423,11 +403,13 @@ export function openTableEditorModal({ table, onSave, onCancel }) {
     });
   }
 
+  modal.querySelector(".table-modal-title span").textContent = `Editor de tabla ${formatLabel(format)}`;
   const body = modal.querySelector(".table-modal-body");
   mountMarkdownTableEditor(body, table, {
+    format,
     onSave: (updated) => {
       modal.hidden = true;
-      onSave?.(updated, writeMarkdownTable(updated));
+      onSave?.(updated, normalizeFormat(format) === "wikitext" ? writeWikitextTable(updated) : writeMarkdownTable(updated));
     },
     onClose: () => {
       modal.hidden = true;

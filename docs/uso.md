@@ -98,8 +98,11 @@ en la pestaña y se asocia al guardar.
 
 Wikitext ofrece edición fuente y resaltado de títulos, énfasis,
 listas, enlaces, plantillas, parámetros, comentarios, tablas, etiquetas y
-referencias. La barra de herramientas Markdown se oculta para evitar insertar
-sintaxis equivocada.
+referencias. La barra de herramientas y el editor de tablas emiten el marcado
+del formato activo: en Wikitext insertan `'''negrita'''`, `''cursiva''`,
+`== títulos ==`, listas `*` y `#`, `<blockquote>`, `<pre>`, enlaces
+`[https://… texto]` y tablas `{| … |}`. La lista de tareas no tiene equivalente
+en Wikitext y su botón se oculta.
 
 La vista previa Wikitext usa la API `action=parse` de la wiki HTTPS configurada
 en Preferencias; Casiopea es el valor inicial. Luca muestra la wiki usada y el
