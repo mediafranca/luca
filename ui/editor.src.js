@@ -109,6 +109,9 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
 
   return {
     getDoc: () => view.state.doc.toString(),
+    // Texto con el fin de línea original (CRLF/CR/LF): toString() siempre une con
+    // "\n"; sliceDoc respeta EditorState.lineSeparator. Úsalo para guardar.
+    getSource: () => view.state.sliceDoc(),
     setDoc: (text) =>
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
     setDark: (d) => view.dispatch({ effects: themeComp.reconfigure(themeFor(d, block)) }),

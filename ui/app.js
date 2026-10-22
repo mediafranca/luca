@@ -39,9 +39,12 @@ async function ensurePreviewRuntime(source = "") {
     marked.use({
       renderer: {
         code(code, lang) {
+          // Escapar siempre: el texto del fence pasa por DOMPurify y luego se lee
+          // con textContent, así que `<`, `&` y `|` del diagrama llegan intactos.
+          const escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;");
           return lang === "mermaid"
-            ? `<pre class="mermaid">${code}</pre>`
-            : `<pre><code>${code.replace(/</g, "&lt;")}</code></pre>`;
+            ? `<pre class="mermaid">${escaped}</pre>`
+            : `<pre><code>${escaped}</code></pre>`;
         },
       },
     });
@@ -136,7 +139,7 @@ function saveSessionSoon() {
 }
 function saveSessionNow() {
   if (restoringSession) return;
-  const snapshot = sessionSnapshot(docs.map((doc) => ({ ...doc, content: doc.ed.getDoc() })), active?.id);
+  const snapshot = sessionSnapshot(docs.map((doc) => ({ ...doc, content: doc.ed.getSource() })), active?.id);
   try { localStorage.setItem(sessionStorageKey, JSON.stringify(snapshot)); } catch {}
 }
 function rememberRecent(path) {
@@ -582,7 +585,9 @@ async function saveDoc(doc, forceDialog = false) {
     // ¿cambió fuera de luca (p.ej. Vera) desde que lo leímos? No pisar en silencio.
     const cur = await TAURI.core.invoke("stat", { path });
     if (cur !== null && doc.lastMtime !== null && cur !== doc.lastMtime &&
-        !confirm("El archivo cambió fuera de luca. ¿Sobrescribir?")) return;
+        // En Tauri el plugin de diálogos vuelve confirm() asíncrono: sin await la
+        // condición nunca bloquea y se sobrescribe antes de que el autor responda.
+        !(await confirm("El archivo cambió fuera de luca. ¿Sobrescribir?"))) return;
   }
   const claimsNewPath = Boolean(TAURI && path !== previousPath);
   if (claimsNewPath) {
@@ -590,7 +595,7 @@ async function saveDoc(doc, forceDialog = false) {
     if (owner) { await TAURI.core.invoke("focus_window", { label: owner }); return; }
   }
   try {
-    doc.lastMtime = await TAURI.core.invoke("write_file", { path, contents: doc.ed.getDoc() });
+    doc.lastMtime = await TAURI.core.invoke("write_file", { path, contents: doc.ed.getSource() });
   } catch (error) {
     if (claimsNewPath) await TAURI.core.invoke("release_document", { path, windowLabel }).catch(() => {});
     throw error;
@@ -613,8 +618,8 @@ async function saveDoc(doc, forceDialog = false) {
 
 const newDoc = () => makeDoc("", null, newDocumentFormat());
 
-function closeDoc(doc, { force = false, release = true, replacement = true } = {}) {
-  if (!force && doc.dirty && !confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`)) return false;
+async function closeDoc(doc, { force = false, release = true, replacement = true } = {}) {
+  if (!force && doc.dirty && !(await confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`))) return false;
   const i = docs.indexOf(doc);
   exitBlockEdit(doc, false);
   doc.editorEl.remove();
@@ -632,7 +637,7 @@ async function moveTabToWindow(doc, target = null) {
   if (!TAURI || !doc) return;
   const targetLabel = target || await TAURI.core.invoke("create_editor_window");
   await TAURI.core.invoke("transfer_tab", { target: targetLabel, payload: transferableTab(doc, document.body.dataset.mode) });
-  closeDoc(doc, { force: true, release: false, replacement: false });
+  await closeDoc(doc, { force: true, release: false, replacement: false });
   if (docs.length === 0) await TAURI.window.getCurrentWindow().close();
 }
 
@@ -640,7 +645,7 @@ async function receiveTransferredTabs() {
   if (!TAURI) return;
   const incoming = await TAURI.core.invoke("take_transferred_tabs", { windowLabel });
   if (incoming.length && docs.length === 1 && isDisposableBlank(docs[0])) {
-    closeDoc(docs[0], { force: true, replacement: false });
+    await closeDoc(docs[0], { force: true, replacement: false });
   }
   for (const payload of incoming) {
     const doc = makeDoc(payload.editorState?.doc || "", payload.path, payload.formatSelection || "auto", payload);
@@ -1671,7 +1676,7 @@ async function restorePreviousSession() {
       if (item.path && TAURI) {
         const owner = await TAURI.core.invoke("claim_document", { path: item.path, windowLabel });
         if (owner) {
-          closeDoc(doc, { force: true, release: false, replacement: false });
+          await closeDoc(doc, { force: true, release: false, replacement: false });
           continue;
         }
       }
