@@ -53,8 +53,8 @@ luca --version
 Usa `--` antes de una ruta que empiece con guion. Las rutas repetidas activan la
 pestaña existente.
 
-El selector **Recientes** de la barra superior conserva hasta veinte rutas, sin
-duplicados. Al iniciar, Luca restaura las pestañas de la sesión anterior. Para
+El submenú **Archivo ▸ Abrir reciente** conserva hasta veinte rutas, sin
+duplicados, y permite vaciarlas. Al iniciar, Luca restaura las pestañas de la sesión anterior. Para
 documentos sucios o sin ruta guarda una instantánea local de recuperación; esa
 instantánea nunca sobrescribe el archivo. Los borradores de más de 2 millones de
 caracteres no se duplican en el almacenamiento del WebView. Cerrar la ventana
@@ -129,8 +129,9 @@ todos los cursores. La misma acción aparece en el menú **Edición**.
 La paleta, los menús y los controles visibles ejecutan las mismas operaciones;
 no hay funciones reservadas exclusivamente a quien recuerde un atajo.
 
-El selector **Esquema** enumera los encabezados Markdown o Wikitext y mueve el
-cursor al elegido. La barra inferior muestra línea, columna, codificación UTF-8,
+El **Esquema de encabezados** es un panel lateral a la izquierda del código,
+apagado por defecto; se enciende con el botón de la barra, el menú Vista o la
+paleta, enumera los encabezados Markdown o Wikitext y mueve el cursor al elegido. La barra inferior muestra línea, columna, codificación UTF-8,
 fin de línea original (`LF`, `CRLF` o `CR`) y formato interpretado.
 
 ## Barra de formato

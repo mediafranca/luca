@@ -121,9 +121,6 @@
   .topbar-btn:hover { color:var(--text); border-color:var(--rule); }
   .topbar-btn.active { background:var(--bg); color:var(--accent); border-color:var(--rule); }
   .topbar-btn .icon { width:14px; height:14px; }
-  .topbar-select { max-width:12rem; border:1px solid transparent; border-radius:7px;
-    padding:4px 7px; background:transparent; color:var(--text-dim); font:12px var(--font-body); }
-  .topbar-select:hover, .topbar-select:focus { border-color:var(--rule); color:var(--text); }
   #statusbar { display:flex; justify-content:flex-end; align-items:center; gap:7px;
     min-height:27px; padding:3px 12px; border-top:1px solid var(--rule);
     background:var(--bg-raised); color:var(--text-dim); font:12px/1.2 var(--font-body); }
@@ -136,6 +133,19 @@
   /* ---- Área de trabajo ---- */
   /* --split: ancho de la columna de código en split (arrastrando el divisor). */
   #workspace { display:grid; grid-template-columns:minmax(12em, var(--split, 50%)) 1px minmax(12em, 1fr); min-height:0; }
+  /* Esquema de encabezados: panel lateral opcional a la izquierda del código. */
+  #outline { overflow:auto; border-right:1px solid var(--rule); background:var(--bg-raised);
+    font:13px/1.35 var(--font-body); padding:10px 0; min-width:0; }
+  #outline[hidden] { display:none; }
+  #outline ul { list-style:none; margin:0; padding:0; }
+  #outline button { display:block; width:100%; text-align:left; border:0; background:transparent;
+    color:var(--text-dim); cursor:pointer; font:inherit; padding:3px 12px;
+    padding-left:calc(12px + (var(--level, 1) - 1) * 12px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #outline button:hover, #outline button:focus-visible { color:var(--text); background:var(--bg); }
+  #outline .empty { padding:3px 12px; color:var(--text-dim); font-style:italic; }
+  body[data-outline="on"] #workspace { grid-template-columns:14rem minmax(12em, var(--split, 50%)) 1px minmax(12em, 1fr); }
+  body[data-outline="on"][data-mode="source"] #workspace,
+  body[data-outline="on"][data-mode="rendered"] #workspace { grid-template-columns:14rem 1fr; }
   #divider { position:relative; background:var(--rule); cursor:col-resize; z-index:5; }
   #divider::after { content:""; position:absolute; top:0; bottom:0; left:-4px; right:-4px; }
   /* El editor tiene su propia medida (--code-width), centrada en su panel. */
@@ -262,7 +272,7 @@
   body[data-zen="on"] #topbar:hover { transform:none; }
   body[data-zen="on"] #topbar::after { content:""; position:absolute; left:0; right:0; top:100%; height:18px; }
 
-  @media (max-width:640px) { #workspace { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } #divider { display:none; } }
+  @media (max-width:640px) { #workspace { grid-template-columns:1fr !important; grid-template-rows:1fr 1fr; } #divider, #outline { display:none; } }
   @media (prefers-reduced-motion: reduce) { body[data-zen="on"] #topbar { transition:none; } }
 
   /* ---- Editor visual de tablas Markdown ---- */
@@ -434,6 +444,7 @@
     #topbar, #statusbar, #editors, #prefs, #about, .table-modal, .preview-edit-table { display:none !important; }
     body { display:block; height:auto; background:#fff; color:#000; }
     #workspace { display:block; }
+    #outline { display:none; }
     #previews { display:block !important; overflow:visible; }
     .doc-preview[hidden] { display:none !important; }
     .doc-preview:not([hidden]) { display:block !important; height:auto; overflow:visible; padding:0;
@@ -456,13 +467,8 @@
         <button type="button" data-mode="split" title="Vista dividida (Split) · ⌘2" aria-label="Vista dividida"></button>
         <button type="button" data-mode="rendered" title="Vista previa (Rendered) · ⌘3" aria-label="Vista previa"></button>
       </div>
+      <button type="button" id="outlineBtn" class="topbar-btn" title="Esquema de encabezados (panel lateral)" aria-label="Esquema de encabezados" aria-pressed="false"></button>
       <span class="spacer"></span>
-      <select id="recentFiles" class="topbar-select" aria-label="Archivos recientes" title="Archivos recientes">
-        <option value="">Recientes…</option>
-      </select>
-      <select id="documentOutline" class="topbar-select" aria-label="Esquema de encabezados" title="Esquema de encabezados">
-        <option value="">Esquema…</option>
-      </select>
       <div class="seg" id="themeSwitch" role="group" aria-label="Esquema claro u oscuro">
         <button type="button" data-theme-btn="light" title="Modo claro" aria-label="Modo claro"></button>
         <button type="button" data-theme-btn="dark" title="Modo oscuro" aria-label="Modo oscuro"></button>
@@ -473,6 +479,7 @@
     </div>
   </div>
   <div id="workspace">
+    <nav id="outline" hidden aria-label="Esquema de encabezados"><ul></ul></nav>
     <div id="editors"></div>
     <div id="divider" role="separator" aria-orientation="vertical" title="Arrastra para cambiar la proporción · doble clic: 50 %"></div>
     <div id="previews"></div>
