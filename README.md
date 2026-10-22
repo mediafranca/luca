@@ -92,6 +92,9 @@ Dependencias y licencias: ver [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Cambios por versión
 
+- **0.6.1:** rescate de 0.6.0: CSP que bloqueaba los estilos de CodeMirror,
+  confirmaciones que no bloqueaban, guardado byte-fiel CRLF, barra y tablas
+  según el formato, recientes en el menú Archivo y esquema como panel lateral.
 - **0.6.0:** edición Markdown y Wikitext por documento; preview MediaWiki
   saneada; paleta, ayuda, búsqueda, esquema, recuperación y recientes; pestañas
   entre ventanas; migración de preferencias, diagnóstico exportable y permisos
