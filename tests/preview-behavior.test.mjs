@@ -58,7 +58,7 @@ test("los @font-face de la wiki se descartan y la familia se conserva", () => {
 // wiki. Si la bandera sobrevive a un cambio de formato, el Markdown se queda
 // sin márgenes y el texto llega al borde.
 test("la bandera de estilos de wiki se limpia antes de ramificar por formato", () => {
-  const app = readFileSync(new URL("../ui/app.js", import.meta.url), "utf8");
+  const app = readFileSync(new URL("../ui/app.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   const pone = [...app.matchAll(/setAttribute\("data-wiki-styles"/g)];
   const quita = [...app.matchAll(/removeAttribute\("data-wiki-styles"\)/g)];
   assert.equal(pone.length, 1, "sólo showWikiHtml debe poner la bandera");

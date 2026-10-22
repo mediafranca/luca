@@ -2,8 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const app = readFileSync(new URL("../ui/app.js", import.meta.url), "utf8");
-const main = readFileSync(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
+// En Windows el checkout entrega CRLF: se normaliza para que los patrones
+// que cruzan líneas no dependan del fin de línea del clon.
+const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const app = read("ui/app.js");
+const main = read("src-tauri/src/main.rs");
 
 // El menú nativo trae CmdOrCtrl+E, que en macOS es sólo ⌘E; el atajo del
 // frontend cubre además Ctrl+E, que CodeMirror se quedaba para fin de línea.

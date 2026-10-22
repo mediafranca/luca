@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const html = readFileSync(new URL("../ui/index.html", import.meta.url), "utf8");
-const app = readFileSync(new URL("../ui/app.js", import.meta.url), "utf8");
+const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const html = read("ui/index.html");
+const app = read("ui/app.js");
 
 test("las superficies principales exponen nombres y roles accesibles", () => {
   assert.match(html, /id="tabs" role="tablist" aria-label="Documentos abiertos"/);

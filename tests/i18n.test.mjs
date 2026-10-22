@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 
 import { CATALOGS, LANGUAGES, MENU_KEYS, detectLanguage, menuLabels, setLanguage, t } from "../ui/i18n.js";
 
-const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8");
+const read = (name) =>
+  readFileSync(new URL(`../${name}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const placeholders = (text) =>
   [...String(text).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
 
