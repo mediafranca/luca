@@ -1,349 +1,215 @@
-# Plan de evolución de Luca
+# Informe de rescate de Luca
 
-Este documento mantiene la dirección de producto y el trabajo pendiente de
-Luca. No sustituye las especificaciones Allium: el plan explica **por qué y en
-qué orden** evolucionará el producto; las specs fijan el comportamiento
-observable de cada cambio antes de implementarlo.
+> Estado al 22 de octubre de 2026. Este documento reemplaza el plan anterior y
+> deja un relevo verificable para continuar el trabajo con otro agente.
 
-## Propósito
+## Alerta principal
 
-Luca es una iniciativa de **MediaFranca**, creada por **Herbert Spencer**: un
-editor de archivos de texto para pensar y escribir con lenguajes de marcado
-legibles. Debe seguir siendo pequeño, local, rápido y comprensible. No pretende
-convertirse en un IDE, un navegador, un gestor de conocimiento ni una segunda
-Vera.
+La versión `v0.6.0` **no es utilizable y no debe volver a publicarse** sin una
+prueba manual completa en una aplicación Tauri nativa.
 
-Principios rectores:
+Herbert comprobó la misma regresión en dos equipos y sistemas distintos:
 
-- el archivo de la persona es la fuente de verdad;
-- abrir y guardar no normaliza ni reescribe contenido silenciosamente;
-- cada función importante es encontrable en la interfaz y accesible por teclado;
-- la vista previa es una proyección, nunca el documento canónico;
-- la integración con servicios externos es explícita y degradable;
-- una función no está terminada hasta quedar especificada, probada, documentada
-  y distribuida correctamente.
+- Andrei, macOS: la aplicación compilada después de `git pull` no abre archivos
+  Markdown con `Cmd+O`, perdió la barra de herramientas, no responde de forma
+  general y no permite escribir en el editor.
+- Alexei, Debian Linux: presenta el mismo retroceso; tampoco permite escribir.
 
-## Estado de `main`
+El release público `v0.6.0` fue eliminado de GitHub para impedir nuevas
+descargas. El tag Git `v0.6.0` todavía existe y apunta a `33c3d34`; no se movió
+ni se borró para evitar reescribir historia sin una decisión explícita.
 
-`main` contiene la evolución a **v0.6.0**: instancia única y CLI, edición
-Markdown/Wikitext por documento, preview MediaWiki saneada, fluidez editorial,
-recuperación, pestañas entre ventanas, diagnóstico, migraciones y reducción de
-la superficie de permisos. La rama local `alexei` ya fue integrada y retirada.
+No considerar terminado el plan anterior. No eliminar este archivo hasta que
+la aplicación nativa haya sido recuperada y certificada manualmente.
 
-Comprobaciones realizadas:
+## Qué ocurrió
 
-- [x] ocho suites JavaScript;
-- [x] pruebas Rust aisladas del parser de argumentos;
-- [x] contrato de empaquetado;
-- [x] validación Allium sin errores nuevos;
-- [x] `cargo fmt --check`;
-- [ ] `cargo check` y build nativo completo en una máquina con encabezados de
-  GTK/WebKit instalados;
-- [ ] pruebas manuales de instancia única, menú, asociaciones e instaladores en
-  macOS, Windows y Linux;
-- [x] integración local en `main`;
-- [ ] push de `main`, etiqueta `v0.6.0` y release.
+Se amplió Luca desde la base `v0.4.2` con funciones editoriales, Wikitext,
+sesiones, accesibilidad, varias ventanas, seguridad, documentación y un flujo
+de release multiplataforma. Las pruebas JavaScript, las pruebas aisladas de
+Rust, `cargo check` en CI y la creación de paquetes pasaron, pero esas
+comprobaciones no abrieron ni ejercitaron la interfaz Tauri real.
 
-Nada de lo marcado como pendiente debe declararse listo sólo porque la interfaz
-web funcione fuera de Tauri.
+Ese vacío fue crítico: se publicó `v0.6.0` después de ver verde la matriz de
+GitHub Actions para Linux, macOS y Windows, sin haber completado la prueba
+manual nativa que el propio plan exigía. Compilar, empaquetar y comprobar
+archivos no demostró que el editor aceptara teclado, que los comandos abrieran
+diálogos ni que la barra siguiera siendo operable.
 
-## Hito 1 — cerrar y publicar v0.5.0
+La publicación fue, por tanto, prematura. No debe tomarse el verde de CI como
+evidencia de funcionamiento de la aplicación.
 
-### Verificación nativa
+## Regresiones confirmadas
 
-- [ ] Abrir varios archivos desde el sistema crea pestañas en una sola ventana.
-- [ ] Reabrir una ruta activa su pestaña y no duplica el documento.
-- [ ] Una segunda invocación restaura, enfoca y entrega archivos a Luca.
-- [ ] `luca archivo…`, `--new`, `--help` y `--version` funcionan desde consola.
-- [ ] Reordenar pestañas por arrastre o teclado conserva texto, estado sucio,
-  selección, historial, cursor y scroll.
-- [ ] Los enlaces `http` y `https` salen al navegador predeterminado; Luca nunca
-  reemplaza su interfaz por una página web.
-- [ ] La edición por bloques funciona en vista mixta y renderizada.
-- [ ] El icono oficial aparece en aplicación, ventana, menú, dock, asociaciones e
-  instaladores.
-- [ ] “Acerca de Luca” muestra versión, autoría, MediaFranca, Pacioli, Casiopea,
-  repositorio y licencia.
-- [ ] `.dmg`, instalador de Windows, `.deb`, `.rpm` y AppImage contienen
-  metadatos, iconos y asociaciones correctos.
+### 1. Atajos de abrir y guardar retirados del manejador global
 
-### Documentación pública en GitHub
+En `ui/app.js`, el manejador global de `keydown` anuncia y maneja varios
+comandos, pero no contiene ramas para `Cmd/Ctrl+O`, `Cmd/Ctrl+S` ni
+`Cmd/Ctrl+Shift+S`. El código delega esos casos al menú nativo. En los WebViews
+probados esa suposición no funcionó de manera fiable. Esto explica directamente
+que `Cmd/Ctrl+O` no haga nada.
 
-El README presenta el producto; una guía de uso separada debe explicar las
-funciones sin obligar a descubrirlas por accidente.
+No se ha aplicado todavía un arreglo. El siguiente agente debe centralizar la
+ejecución de comandos para que menú, paleta y teclado invoquen la misma ruta, y
+probarla dentro de Tauri en macOS y Linux.
 
-- [x] Crear `docs/uso.md` y enlazarlo prominentemente desde el README.
-- [x] Documentar todos los atajos de archivo: nuevo, abrir, guardar, guardar como,
-  cerrar pestaña, exportar PDF y preferencias.
-- [x] Documentar los tres modos, el modo zen y la edición por bloques en vista
-  mixta y renderizada.
-- [x] Documentar la **multiselección**: `⌘D` / `Ctrl+D`, selección de la siguiente
-  aparición y operaciones simultáneas sobre los cursores.
-- [x] Documentar reordenamiento de pestañas por arrastre y con
-  `Alt+Shift+←/→`.
-- [x] Documentar instancia única, deduplicación por ruta y apertura de varios
-  archivos desde sistema y CLI.
-- [x] Documentar la barra completa: encabezados H1–H6 y párrafo, negrita,
-  cursiva, tachado, subrayado, superíndice, subíndice, código, cita, listas,
-  tareas, bloque de código, enlace Markdown, enlace interno y tablas.
-- [x] Documentar el editor visual de tablas, alineación, cambio de eje, filas y
-  columnas, y pegado/copiado tabular cuando corresponda al comportamiento real.
-- [x] Documentar Mermaid offline, motores incluidos, errores visibles y qué
-  sintaxis no interpreta Luca.
-- [x] Documentar rutas relativas de imágenes y medios, sincronización de scroll,
-  cambios externos, guardado atómico y confirmación antes de descartar.
-- [x] Documentar claro/oscuro, tipografías, tokens de diseño, importación,
-  exportación y restauración de valores.
-- [x] Documentar diferencias entre paquete instalable y AppImage portátil,
-  incluida la integración del icono y asociaciones en Linux.
-- [x] Añadir capturas actuales y texto alternativo útil.
-- [ ] Mantener una sección de cambios por release y enlazar las funciones a sus
-  issues o specs cuando ayude a verificarlas.
+### 2. Barra de herramientas desaparecida o inutilizable
 
-## Hito 2 — formatos por documento: Markdown y Wikitext
+La barra se crea dinámicamente junto a los modos mediante
+`createEditorToolbar`. Comparada con `v0.4.2`, se agregaron en la misma fila los
+selectores de archivos recientes y esquema, además de los controles ya
+existentes. La fila está sometida a mucha más presión horizontal y la propia
+barra puede encogerse y desbordarse. Herbert informa que en las aplicaciones
+nativas desaparece por completo.
 
-### Modelo de interacción
+La prueba del frontend servido por HTTP en Chrome sí montó CodeMirror y la
+barra, por lo que esa prueba no reproduce ni descarta el fallo del WebView
+nativo. Aún falta capturar consola y geometría dentro de Tauri.
 
-El formato pertenece a cada documento, no a toda la aplicación.
+### 3. El editor no acepta escritura
 
-- [x] Añadir una barra de estado compacta al pie del editor.
-- [x] Mostrar a la derecha el formato supuesto: **Markdown** o **Wikitext**.
-- [x] Al pulsarlo, desplegar:
-  - Automático por extensión;
-  - Markdown;
-  - Wikitext.
-- [x] Inferir `.md` y `.markdown` como Markdown.
-- [x] Inferir `.wiki` y `.wikitext` como Wikitext.
-- [x] Usar la preferencia global sólo como formato inicial de documentos nuevos.
-- [x] Permitir Markdown y Wikitext simultáneamente en pestañas distintas.
-- [x] Guardar el override por ruta en el estado local de Luca, nunca dentro del
-  archivo.
-- [x] En documentos sin ruta, mantener el override en la pestaña y asociarlo al
-  guardar.
-- [x] En modo automático, volver a inferir tras un cambio de extensión; con
-  override, conservar la elección explícita.
-- [x] Avisar discretamente cuando formato y extensión discrepen, sin impedir el
-  guardado.
-- [x] Cambiar el formato sólo altera interpretación, resaltado, comandos y vista
-  previa: **no convierte ni reescribe el contenido**.
+Está confirmado por Herbert en macOS y Linux. La causa todavía **no está
+aislada**. No atribuirla sin evidencia al caché de `ui/vendor/`: esa fue una
+hipótesis inicial, pero el fallo se reprodujo también en Linux y el bundle
+local inspeccionado sí contiene las APIs nuevas de CodeMirror (`setFormat`,
+`gotoLine`, `selectAllMatches` y `getCursorLocation`).
 
-### Primer corte: edición fuente Wikitext
+Posibles áreas de investigación, no conclusiones:
 
-- [x] Especificar inferencia, override, persistencia y preservación byte-fiel en
-  Allium antes de implementar.
-- [x] Reutilizar o adaptar una gramática mantenida para CodeMirror 6; evaluar
-  primero el trabajo oficial de MediaWiki y su compatibilidad/licencia.
-- [x] Resaltar títulos, énfasis, listas, enlaces internos y externos, plantillas,
-  parámetros, comentarios, tablas, etiquetas y referencias.
-- [x] Ajustar la barra de herramientas al formato activo: no insertar sintaxis
-  Markdown en un documento Wikitext.
-- [x] Añadir asociaciones de archivo, filtros de apertura/guardado, MIME e iconos
-  para `.wiki` y `.wikitext` en todos los instaladores.
-- [x] Añadir fixtures reales y pruebas que demuestren que abrir y guardar Wikitext
-  no altera bytes, saltos de línea ni sintaxis desconocida.
-- [x] Actualizar README, guía de uso, ayuda, Acerca de y metadatos: Luca dejará de
-  describirse como exclusivamente Markdown.
+- error o excepción del WebView nativo que no aparece en la prueba HTTP;
+- foco capturado por controles o diálogos superpuestos;
+- interacción entre restauración de sesión, activación del documento y
+  serialización de CodeMirror;
+- diferencias del protocolo Tauri, CSP o APIs globales respecto del navegador;
+- geometría, `z-index` o `pointer-events` de la nueva interfaz.
 
-Referencia primaria: [CodeMirror de MediaWiki](https://www.mediawiki.org/wiki/Extension:CodeMirror).
+El próximo diagnóstico debe comenzar obteniendo la consola del WebView y una
+traza de eventos de foco/teclado en una ejecución nativa, no agregando parches a
+ciegas.
 
-### Segundo corte: vista previa mediante una wiki
+## Trabajo incorporado desde `v0.4.2`
 
-Wikitext no tiene una previsualización universal: plantillas, funciones,
-extensiones, espacios de nombres y estilos pertenecen a una instalación
-MediaWiki. Luca no construirá un parser aproximado que finja equivalencia.
+Historial actual, de más reciente a más antiguo:
 
-- [x] Permitir configurar una wiki de previsualización; Casiopea será la primera.
-- [x] Enviar texto y contexto de título a la API oficial `action=parse`.
-- [x] Sanear estrictamente el HTML antes de insertarlo en el WebView.
-- [x] Resolver recursos y enlaces respecto de la wiki configurada.
-- [x] Abrir enlaces web en el navegador; definir explícitamente el comportamiento
-  de enlaces internos de la wiki.
-- [x] Mostrar estado inequívoco: wiki usada, actualizando, sin conexión, respuesta
-  en caché o error.
-- [x] Mantener edición fuente completa sin conexión.
-- [x] No presentar una respuesta en caché como si fuera actual.
-- [x] Definir límites, cancelación y debounce para no enviar el documento en cada
-  pulsación.
-- [x] Tratar autenticación y cookies como una capacidad posterior y explícita;
-  no reutilizar sesiones del navegador silenciosamente.
+- `c75f2c5` — agregó Flatpak como hito comunitario al roadmap.
+- `33c3d34` — documentó la auditoría de dependencias; es el objetivo del tag
+  `v0.6.0`.
+- `71129a9` — corrigió la compilación del guard de navegación con la versión
+  actual de Tauri.
+- `1b3894d` — agregó tamaños y SHA-256 de instaladores al flujo de release.
+- `ede286d` — agregó pruebas de round-trip byte-fiel para Wikitext.
+- `296dc4e` — agregó mejoras de accesibilidad por teclado.
+- `ba38f74` — alineó documentación para la versión 0.6.
+- `6ce0f2f` — sincronizó versiones y preparó `0.6.0`.
+- `f0830b0` — completó trabajo de multiventana, seguridad y confianza.
+- `4a684d9` — eliminó artefactos Swift obsoletos.
+- `0ef599e` — restauró controles de multiventana y confianza.
+- `71f1485` — agregó Wikitext y flujo editorial.
+- `1ce36e5` — agregó el plan de evolución original.
+- `3dc4732` — evolucionó Luca a un espacio único con pestañas.
+- `a1aec9d` — abrió enlaces fuera de Luca y habilitó edición en vista mixta.
 
-Referencia primaria: [API de parsing de Wikitext](https://www.mediawiki.org/wiki/API:Parsing_wikitext).
+### Funcionalidad añadida o modificada
 
-### Fuera de este hito
+- Formatos Markdown y Wikitext por documento, detección por extensión y
+  preservación del texto original.
+- Previsualización Wikitext a través de una API MediaWiki HTTPS configurada.
+- Restauración de sesión, archivos recientes, esquema de encabezados, estado de
+  cursor, codificación y fin de línea.
+- Paleta de comandos y diálogo de atajos.
+- Varias ventanas, transferencia de pestañas y prevención de abrir una misma
+  ruta en dos ventanas.
+- Sanitización de HTML con DOMPurify, restricción del protocolo de assets,
+  apertura externa de enlaces y guard de navegación.
+- Diagnóstico exportable sin contenido, rutas ni credenciales.
+- Mejoras de roles, foco, etiquetas y navegación de pestañas.
+- Asociaciones de archivos Markdown y Wikitext en los paquetes.
 
-Un WYSIWYG Wikitext reversible y sin pérdida no es “otro renderer”. MediaWiki lo
-resuelve mediante Parsoid y VisualEditor. Sólo se evaluará después de validar la
-edición fuente y la previsualización remota; no se implementará un subconjunto
-ambiguo bajo la etiqueta WYSIWYG.
+Todas estas capacidades deben considerarse provisionales hasta que pasen una
+prueba funcional nativa; su presencia en el código no prueba su usabilidad.
 
-Referencia primaria: [Parsoid](https://www.mediawiki.org/wiki/Parsoid).
+## Verificaciones que sí se ejecutaron
 
-## Hito 3 — fluidez editorial
+- 10 pruebas JavaScript pasaron, incluidas pruebas de formato, sesión,
+  navegación, transferencia de ventanas, accesibilidad estática y Wikitext.
+- 3 pruebas aisladas de I/O Rust pasaron.
+- `allium check specs/` pasó con advertencias ya documentadas.
+- La matriz de GitHub Actions compiló y empaquetó exitosamente en Ubuntu,
+  macOS universal y Windows.
+- Se generaron `.deb`, `.rpm`, `.AppImage`, `.dmg`, `.app.tar.gz`, `.msi` y
+  `.exe`, con manifiestos de tamaño y SHA-256.
+- `cargo audit` no encontró vulnerabilidades conocidas; informó seis
+  advertencias documentadas en `THIRD_PARTY.md`, incluidas dependencias sin
+  mantenimiento, una advertencia de `glib` y `tokio 1.54.0` retirado.
+- `npm audit --omit=dev` informó 11 avisos: 2 bajos y 9 altos.
+- El frontend servido por HTTP se montó en Chrome headless y creó CodeMirror.
 
-- [x] Ayuda de atajos consultable desde la aplicación.
-- [x] Paleta de comandos con búsqueda por nombre y atajo.
-- [x] Buscar y reemplazar, seleccionar todas las apariciones e ir a línea.
-- [x] Esquema lateral de encabezados para navegar documentos largos.
-- [x] Barra de estado sobria: línea, columna, codificación, fin de línea y formato.
-- [x] Archivos recientes y restauración de pestañas entre sesiones.
-- [x] Recuperación de borradores tras cierre inesperado, sin sustituir archivos.
-- [x] Indicadores claros de guardado, cambio externo y conflicto.
-- [x] Mejorar el resaltado semántico de Markdown y Wikitext con contraste
-  comprobado, sin convertir el editor en un arcoíris de IDE.
-- [x] Añadir semántica de pestañas, regiones y diálogos, navegación de pestañas
-  por teclado, foco visible y retorno del foco; cubrirlo con regresión automática.
-- [ ] Probar manualmente la navegación completa por teclado, lector de pantalla,
-  zoom y movimiento reducido en la aplicación nativa.
+Estas verificaciones sólo demuestran sus alcances concretos. Ninguna sustituyó
+una prueba de la aplicación de escritorio.
 
-## Hito 4 — pestañas entre ventanas
+## Verificaciones que no se ejecutaron antes de publicar
 
-La ventana única sigue siendo el comportamiento normal; nuevas ventanas son una
-acción explícita.
+- Escribir texto en el editor dentro de Tauri.
+- Abrir con menú, botón, `Cmd/Ctrl+O`, asociación de archivo y línea de comandos.
+- Guardar, Guardar como, detectar modificaciones externas y cancelar cierres.
+- Revisar visualmente la barra en los tamaños soportados.
+- Probar pestañas, sesión restaurada, varias ventanas y transferencia.
+- Probar Markdown, Wikitext, Mermaid, impresión y temas en paquetes instalados.
+- Ejecutar tecnologías de asistencia.
+- Instalar y probar manualmente cada artefacto de macOS, Linux y Windows.
 
-- [x] `⌘⇧N` / `Ctrl+Shift+N`: nueva ventana.
-- [x] Arrastrar una pestaña fuera crea una ventana.
-- [x] Arrastrar sobre otra ventana reúne la pestaña.
-- [x] Menú **Ventana → Reunir todas las ventanas**.
-- [x] Mover pestañas entre ventanas también mediante teclado y menú.
-- [x] Mantener un registro global con un único dueño por documento.
-- [x] Transferir sin pérdida texto sin guardar, historial de deshacer, selección,
-  cursores múltiples, scroll, formato supuesto/override y modo de vista.
-- [x] Resolver qué ocurre al cerrar una ventana con documentos sucios.
-- [x] No iniciar implementación hasta especificar propiedad, transferencia y
-  recuperación ante fallo.
+## Estado de publicación y ramas
 
-## Hito 5 — confianza y v1.0
+- `main` y `origin/main`: `c75f2c5` al redactar este informe.
+- Rama de trabajo conservada: `codex/plan-cierre`, en el worktree
+  `.worktrees/plan-cierre`.
+- Tag conservado: `v0.6.0` → `33c3d34`.
+- Release GitHub `v0.6.0`: eliminado el 22 de octubre de 2026 y confirmado como
+  inexistente mediante `gh release view`.
+- Workflow que produjo los binarios retirados: ejecución `39703572008`; sus tres
+  jobs terminaron verdes, lo cual ilustra la insuficiencia del control actual.
+- La rama antigua `alexei` fue eliminada previamente por petición de Herbert.
 
-- [ ] Matriz automatizada y manual en macOS Apple Silicon/Intel, Windows y Linux.
-- [ ] Instaladores firmados/notarizados y actualizaciones verificables.
-- [x] Política de migración para preferencias y estado local.
-- [x] Prueba estructural de accesibilidad y revisión visual base en navegador.
-- [ ] Pruebas de accesibilidad con tecnología de asistencia y regresión visual
-  esenciales en la aplicación nativa de cada plataforma.
-- [x] Diagnóstico exportable sin incluir documentos, credenciales ni rutas
-  sensibles.
-- [x] Política de privacidad y conectividad que distinga recursos locales,
-  actualización, CDN y previsualización MediaWiki.
-- [x] Documentación de recuperación, desinstalación y ubicación de datos.
+## Orden recomendado para el rescate
 
-## Hito 6 — Flatpak y contribución a la comunidad
+1. Marcar `v0.6.0` como fallida y decidir explícitamente si se conserva o elimina
+   el tag. No moverlo silenciosamente.
+2. Ejecutar Tauri nativo en modo desarrollo con consola del WebView visible.
+3. Reducir el arranque hasta recuperar un editor capaz de recibir texto.
+4. Comparar por bisección desde `v0.4.2`; no intentar reparar todas las funciones
+   nuevas simultáneamente.
+5. Recuperar la barra y validar su geometría a 960×620 y tamaños menores.
+6. Unificar menú, teclado y paleta en un único despachador de comandos y cubrir
+   abrir/guardar con pruebas.
+7. Crear una prueba de humo nativa que compruebe al menos: documento inicial,
+   entrada de teclado, abrir, guardar y presencia de la barra.
+8. Reintroducir por grupos las capacidades nuevas, probándolas manualmente.
+9. Publicar una versión SemVer nueva —no reutilizar binarios `v0.6.0`— sólo tras
+   certificación humana en macOS, Linux y Windows.
 
-Publicar Luca en Flathub no es sólo sumar otro instalador: es adoptar un canal
-comunitario reproducible, revisable y mantenido. El identificador estable será
-`net.mediafranca.luca`. La entrega debe preservar el sandbox de Flatpak y no
-obtener una aprobación concediendo acceso general al equipo.
+## Flatpak: hito posterior al rescate
 
-La política de Flathub vigente prohíbe manifiestos generados o asistidos por IA
-y la automatización del PR de envío. Herbert redactará y certificará el
-manifiesto y presentará el PR; los agentes pueden investigar, comprobar,
-diagnosticar y revisar material escrito por él, pero no producir ese manifiesto,
-el mensaje de envío ni respuestas de revisión.
+La publicación en Flathub sigue siendo un hito comunitario importante, pero no
+debe comenzar hasta recuperar una versión estable.
 
-- [ ] Preparar en el repositorio upstream un archivo AppStream completo y
-  validado, desktop file exportable, iconos con el ID y capturas aprobadas.
-- [ ] Incorporar una localización inglesa completa y revisada por una persona
-  para interfaz, ayuda, metadatos y documentación visible en Flathub.
-- [ ] Documentar qué funciones necesitan red, portales de archivos, apertura de
-  enlaces, Wayland/X11 y aceleración; justificar cada permiso del sandbox.
-- [ ] Hacer que diálogos y apertura/guardado usen portales correctamente, sin
-  `--filesystem=home` ni acceso amplio al host.
-- [ ] Documentar un build desde fuentes completamente offline y reproducible;
-  todas las dependencias deben tener fuentes públicas y hashes fijados.
-- [ ] Herbert redacta y certifica `net.mediafranca.luca.yml`; Luca aporta un
-  verificador que comprueba ID, versión, metadatos, permisos y fuentes sin
-  reescribir el manifiesto.
-- [ ] Construir, instalar y ejecutar localmente con `flatpak-builder`; probar
-  abrir/guardar, asociaciones, varias ventanas, enlaces, preview MediaWiki,
-  recuperación y desinstalación dentro del sandbox.
-- [ ] Publicar un `.flatpak` de prueba con tamaño y SHA-256 para la comunidad,
-  claramente separado de la publicación oficial de Flathub.
-- [ ] Herbert abre el PR contra `flathub/new-pr`, declara la asistencia de IA
-  exigida por la política y responde personalmente a la revisión comunitaria.
-- [ ] Tras aceptación, verificar la ficha pública, descargas, actualización,
-  permisos mostrados y procedimiento de mantenimiento de cada nueva versión.
+La política de Flathub exige que el manifiesto y la interacción de la propuesta
+no sean generados ni automatizados por IA. Herbert debe escribir personalmente
+`net.mediafranca.luca.yml`, el texto del PR y las respuestas de revisión, además
+de declarar el uso de IA en el proyecto upstream. La localización inglesa debe
+ser humana. Un agente puede investigar, revisar y ejecutar validaciones sobre
+material escrito por Herbert, pero no redactar el manifiesto ni la propuesta.
 
-Referencias primarias: [requisitos de Flathub](https://docs.flathub.org/docs/for-app-authors/requirements),
-[permisos del sandbox](https://docs.flatpak.org/en/latest/sandbox-permissions.html)
-y [guía Flatpak de Tauri 2](https://v2.tauri.app/distribute/flatpak/).
+Referencias oficiales:
 
-## Optimización, seguridad y limpieza
+- <https://docs.flathub.org/docs/for-app-authors/requirements>
+- <https://docs.flathub.org/docs/for-app-authors/metainfo-guidelines>
+- <https://docs.flatpak.org/en/latest/sandbox-permissions.html>
+- <https://v2.tauri.app/distribute/flatpak/>
 
-### El WebView no es el navegador accidental
+## Criterio real para volver a declarar Luca lista
 
-Luca usa Tauri: CodeMirror, la vista previa y toda la interfaz HTML/CSS/JS corren
-en el **WebView del sistema**. Quitar ese motor equivaldría a reescribir la
-aplicación con una interfaz nativa y perder el fundamento técnico actual. Lo que
-sí debe eliminarse es el comportamiento de navegador:
-
-- [x] los enlaces web se delegan al navegador predeterminado;
-- [x] bloquear también a nivel nativo cualquier navegación no autorizada de la
-  ventana principal, aunque un manejador de la interfaz falle;
-- [x] auditar todos los lugares que producen enlaces: preview, Acerca de,
-  Mermaid y futura vista Wikitext;
-- [x] conservar anclas internas sólo cuando pertenecen al documento actual;
-- [x] añadir pruebas que demuestren que ninguna URL sustituye la interfaz.
-
-### Carga y tamaño
-
-El runtime web actual ocupa aproximadamente 15 MiB; Mermaid, ELK y ZenUML
-concentran la mayor parte.
-
-- [ ] Medir tamaño instalado, tiempo de arranque, memoria con 1/10/50 pestañas y
-  latencia de escritura antes de optimizar.
-- [x] Cargar Marked y Mermaid sólo cuando la vista previa se usa.
-- [x] Cargar Mermaid y cada motor de layout sólo cuando el documento contiene un
-  diagrama que lo necesita.
-- [x] Evaluar si ELK, tidy-tree y ZenUML deben distribuirse siempre o como módulos
-  opcionales; preservar Mermaid offline como contrato.
-- [ ] Evitar rerenderizar el documento completo cuando una actualización por
-  bloques sea correcta y mediblemente mejor.
-- [x] Cancelar renders obsoletos en vez de dejarlos terminar.
-- [ ] Medir antes de virtualizar editores o previews inactivos; no sacrificar
-  historial, cursor ni scroll por ahorrar memoria teórica.
-- [x] Comprimir/optimizar el icono que se copia al runtime sin crear otra fuente
-  maestra.
-
-### Offline, red y superficie de permisos
-
-- [x] Eliminar el respaldo CDN si los recursos vendor locales cubren todas las
-  rutas; entonces retirar `cdn.jsdelivr.net` de CSP y `connect-src`.
-- [x] Si se conserva un fallback de red, hacerlo explícito en Preferencias y en la
-  documentación, desactivado por defecto. No se conserva ningún fallback.
-- [x] Restringir `assetProtocol.scope`, actualmente `**`, a las rutas mínimas que
-  necesitan los documentos abiertos.
-- [x] Reducir permisos de opener a protocolos y destinos necesarios.
-- [x] Revisar `dangerousDisableAssetCspModification` y `unsafe-inline`; retirar
-  excepciones que ya no sean necesarias.
-- [x] Sanear HTML Markdown y Wikitext sin romper contenido legítimo ni permitir
-  que un archivo local ejecute interfaz o scripts privilegiados.
-- [x] Separar en la UI y la política de red: actualizaciones, recursos opcionales
-  y previsualización mediante MediaWiki.
-
-### Reproducibilidad y repositorio
-
-- [x] Versionar `package-lock.json` y usar `npm ci` en CI para builds
-  reproducibles.
-- [x] Auditar dependencias npm y Cargo por uso real, licencia, tamaño y
-  mantenimiento antes de añadir nuevas.
-- [x] Confirmar que el antiguo árbol Swift `.build/` no es fuente ni artefacto de
-  distribución; después retirarlo del repositorio en un cambio explícito y
-  recuperable, nunca como limpieza lateral.
-- [x] Mantener `ui/vendor/`, `node_modules/` y `src-tauri/target/` como generados.
-- [ ] Hacer que CI verifique versiones sincronizadas, contenido de paquetes,
-  asociaciones, iconos, specs, pruebas y build de cada plataforma antes de una
-  release.
-- [x] Publicar tamaños y hashes de artefactos para detectar regresiones en cada
-  release; la primera publicación efectiva ocurrirá con `v0.6.0`.
-
-## Criterio de terminado para cualquier hito
-
-Un cambio está terminado cuando:
-
-1. su comportamiento observable está en Allium;
-2. la implementación preserva archivos y cambios ajenos;
-3. las pruebas focalizadas y de regresión pasan;
-4. se comprobó en la aplicación nativa, no sólo en navegador;
-5. la función es encontrable, accesible y está documentada en GitHub;
-6. los instaladores y metadatos de cada plataforma son coherentes;
-7. quedan registrados límites, riesgos y verificaciones no ejecutadas;
-8. el commit es acotado y la publicación ocurre sólo con autorización explícita.
+Luca sólo estará lista cuando una persona pueda instalar el artefacto final en
+cada plataforma, escribir y editar texto, abrir y guardar Markdown, usar la
+barra y los atajos, cerrar y reabrir documentos sin pérdida, y completar los
+flujos esenciales sin errores de consola. CI debe complementar esa
+certificación, no reemplazarla.
