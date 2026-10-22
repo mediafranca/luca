@@ -485,7 +485,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(
-            tauri::plugin::Builder::new("navigation-guard")
+            tauri::plugin::Builder::<_, ()>::new("navigation-guard")
                 .on_navigation(|_, url| {
                     navigation_allowed(url.scheme(), url.host_str(), cfg!(debug_assertions))
                 })
