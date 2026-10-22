@@ -80,12 +80,12 @@ cargo tauri dev
 cargo tauri build
 ```
 
-Los hooks de Tauri ejecutan `npm run vendor`. El script sale sin reconstruir
-si `ui/vendor/` ya existe. Después de cambiar `ui/editor.src.js`, dependencias
-o el propio script, reconstruye explícitamente con:
+Los hooks de Tauri ejecutan `npm run vendor`. El script reconstruye siempre
+`ui/vendor/` porque la carpeta no se versiona y puede pertenecer a una revisión
+anterior. Para regenerarla manualmente usa:
 
 ```sh
-npm run vendor -- --force
+npm run vendor
 ```
 
 - JavaScript: `node --check ui/app.js`, `node --check ui/editor.src.js` y

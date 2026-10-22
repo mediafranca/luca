@@ -41,51 +41,41 @@ evidencia de funcionamiento de la aplicación.
 
 ## Regresiones confirmadas
 
-### 1. Atajos de abrir y guardar retirados del manejador global
+### 1. Atajos de abrir y guardar: observación inicial, no causa raíz
 
-En `ui/app.js`, el manejador global de `keydown` anuncia y maneja varios
-comandos, pero no contiene ramas para `Cmd/Ctrl+O`, `Cmd/Ctrl+S` ni
-`Cmd/Ctrl+Shift+S`. El código delega esos casos al menú nativo. En los WebViews
-probados esa suposición no funcionó de manera fiable. Esto explica directamente
-que `Cmd/Ctrl+O` no haga nada.
+En `ui/app.js`, el manejador global de `keydown` no contiene ramas para
+`Cmd/Ctrl+O`, `Cmd/Ctrl+S` ni `Cmd/Ctrl+Shift+S`; esos aceleradores se delegan
+al menú nativo. Esta arquitectura ya existía en `v0.4.2`, por lo que no explica
+por sí sola el retroceso. En la compilación rota ningún atajo podía funcionar
+porque `app.js` no llegaba a ejecutarse.
 
-No se ha aplicado todavía un arreglo. El siguiente agente debe centralizar la
-ejecución de comandos para que menú, paleta y teclado invoquen la misma ruta, y
-probarla dentro de Tauri en macOS y Linux.
+Sigue siendo recomendable centralizar menú, paleta y teclado en una misma ruta,
+pero no debe presentarse esta observación como causa confirmada del incidente.
 
-### 2. Barra de herramientas desaparecida o inutilizable
+### 2. Causa raíz confirmada: runtime `vendor` obsoleto
 
-La barra se crea dinámicamente junto a los modos mediante
-`createEditorToolbar`. Comparada con `v0.4.2`, se agregaron en la misma fila los
-selectores de archivos recientes y esquema, además de los controles ya
-existentes. La fila está sometida a mucha más presión horizontal y la propia
-barra puede encogerse y desbordarse. Herbert informa que en las aplicaciones
-nativas desaparece por completo.
+`ui/vendor/` no se versiona. `scripts/vendor.mjs` salía inmediatamente si esa
+carpeta ya existía, aunque perteneciera a una revisión anterior. Después de un
+`git pull`, Tauri ejecutaba el hook `npm run vendor`, pero el hook no actualizaba
+nada.
 
-La prueba del frontend servido por HTTP en Chrome sí montó CodeMirror y la
-barra, por lo que esa prueba no reproduce ni descarta el fallo del WebView
-nativo. Aún falta capturar consola y geometría dentro de Tauri.
+En el checkout principal de Alexei se confirmó que faltaba
+`ui/vendor/dompurify/purify.es.mjs`, importado estáticamente al comienzo de
+`ui/app.js`, y que el bundle de CodeMirror era anterior. Al fallar ese import,
+el módulo completo no se ejecutaba: no se insertaba la barra, no se creaba el
+editor y no se registraban eventos. Esto explica conjuntamente los síntomas
+observados en macOS y Linux.
 
-### 3. El editor no acepta escritura
+Se corrigió `scripts/vendor.mjs` para reconstruir siempre la carpeta completa.
+El arreglo debe verificarse todavía en una ejecución Tauri nativa en macOS y
+Linux antes de declarar recuperada la aplicación.
 
-Está confirmado por Herbert en macOS y Linux. La causa todavía **no está
-aislada**. No atribuirla sin evidencia al caché de `ui/vendor/`: esa fue una
-hipótesis inicial, pero el fallo se reprodujo también en Linux y el bundle
-local inspeccionado sí contiene las APIs nuevas de CodeMirror (`setFormat`,
-`gotoLine`, `selectAllMatches` y `getCursorLocation`).
+### 3. El editor no aceptaba escritura
 
-Posibles áreas de investigación, no conclusiones:
-
-- error o excepción del WebView nativo que no aparece en la prueba HTTP;
-- foco capturado por controles o diálogos superpuestos;
-- interacción entre restauración de sesión, activación del documento y
-  serialización de CodeMirror;
-- diferencias del protocolo Tauri, CSP o APIs globales respecto del navegador;
-- geometría, `z-index` o `pointer-events` de la nueva interfaz.
-
-El próximo diagnóstico debe comenzar obteniendo la consola del WebView y una
-traza de eventos de foco/teclado en una ejecución nativa, no agregando parches a
-ciegas.
+Es una consecuencia del mismo fallo de carga: sin ejecutar `app.js`, CodeMirror
+nunca se montaba. Si el problema persiste después de reconstruir `ui/vendor/`,
+el siguiente diagnóstico debe obtener la consola del WebView y una traza de
+foco/teclado en una ejecución nativa, no agregar parches a ciegas.
 
 ## Trabajo incorporado desde `v0.4.2`
 

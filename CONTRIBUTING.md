@@ -52,7 +52,7 @@ Antes de proponer el cambio, ejecuta lo que corresponda a su alcance:
 
 ```bash
 npm test
-npm run vendor -- --force  # si cambió editor.src.js, dependencias o vendor.mjs
+npm run vendor             # reconstruye siempre ui/vendor/ desde las fuentes actuales
 cargo fmt --check --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 allium check specs/

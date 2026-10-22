@@ -1,19 +1,14 @@
 #!/usr/bin/env node
 // Copia el subconjunto runtime de mermaid@12 + add-ons + marked a ui/vendor/.
 // Sigue el grafo de imports relativos (.mjs) desde cada entry y copia su cierre
-// transitivo — nada de .map ni .d.ts. Idempotente: salta si ya existe (--force).
+// transitivo — nada de .map ni .d.ts. Siempre reconstruye la salida: ui/vendor
+// no se versiona y puede pertenecer a una revisión anterior del repositorio.
 import { readFileSync, existsSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
 import { dirname, resolve, relative, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, "ui", "vendor");
-const force = process.argv.includes("--force");
-
-if (existsSync(out) && !force) {
-  console.log("vendor: ui/vendor ya existe (usa --force para rehacer)");
-  process.exit(0);
-}
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
