@@ -70,12 +70,65 @@ Se corrigió `scripts/vendor.mjs` para reconstruir siempre la carpeta completa.
 El arreglo debe verificarse todavía en una ejecución Tauri nativa en macOS y
 Linux antes de declarar recuperada la aplicación.
 
-### 3. El editor no aceptaba escritura
+### 3. Segunda causa raíz confirmada: la CSP bloqueaba los estilos de CodeMirror
+
+Verificado el 21 de octubre de 2026 en Tauri nativo (Debian, WebKitGTK 2.54)
+con el inspector remoto del WebView: incluso con `ui/vendor/` correcto, el
+documento tenía una sola hoja de estilos. CodeMirror inyecta su tema base en un
+`<style>` dinámico y `f0830b0` quitó `dangerousDisableAssetCspModification:
+["style-src"]` de `tauri.conf.json` (lo había añadido `dbd6985` justamente para
+esto). Tauri pasó a añadir hashes a `style-src`; por la especificación de CSP,
+con hashes presentes `'unsafe-inline'` se ignora y el `<style>` de CodeMirror
+(y los `<style>` dentro del SVG de Mermaid) quedaron bloqueados. Sin el tema
+base, `.cm-scroller` no es `flex`: la numeración ocupa todo el ancho y el
+contenido queda apilado 2000 px más abajo, fuera de la ventana y sin scroll.
+Aplica a todas las plataformas. Corregido restaurando la clave y con un guard
+en `scripts/check-packaging.mjs`.
+
+### 4. Las confirmaciones nunca bloqueaban
+
+En la webview de Tauri el plugin de diálogos sustituye `window.confirm` por
+una función asíncrona que devuelve una `Promise`. `app.js` la usaba como
+booleano síncrono (`!confirm(...)`), así que «¿Sobrescribir?» y «¿Cerrar
+igual?» se mostraban después de haber sobrescrito el archivo o cerrado la
+pestaña. Verificado en nativo: con el archivo modificado fuera, Guardar lo
+pisaba antes de responder. Corregido con `await` en ambos puntos.
+
+### 5. El editor no aceptaba escritura
 
 Es una consecuencia del mismo fallo de carga: sin ejecutar `app.js`, CodeMirror
 nunca se montaba. Si el problema persiste después de reconstruir `ui/vendor/`,
 el siguiente diagnóstico debe obtener la consola del WebView y una traza de
 foco/teclado en una ejecución nativa, no agregar parches a ciegas.
+
+## Sesión de auditoría del 21 de octubre de 2026
+
+Verificado en Tauri nativo (Linux, binario compilado desde `dev`) con un
+archivo CRLF de prueba: arranque con ruta por argumento, teclado en el editor,
+vista dividida con Mermaid, guardado byte-fiel (CRLF conservado), instancia
+única (misma ruta no se duplica, segunda ruta se añade), diálogo de
+modificación externa y diálogo de cierre con cambios. Correcciones en `dev`:
+
+- CSP: `dangerousDisableAssetCspModification: ["style-src"]` restaurado y
+  `media-src` añadido para vídeo y audio locales.
+- `confirm()` con `await` al sobrescribir y al cerrar pestañas con cambios.
+- Guardado y sesión con `getSource()` (`sliceDoc`): `toString()` de CodeMirror
+  convertía CRLF/CR a LF al guardar.
+- Permiso `core:window:allow-close`, necesario para mover o reunir pestañas.
+- Fences de código y Mermaid escapados antes de DOMPurify (`<br/>`, `|x<5|`).
+- Barra de herramientas y editor de tablas condicionados al formato
+  (`ui/format-syntax.js`, `ui/wikitext-table.js`); en Wikitext ya no se
+  ocultan. 11 tests nuevos.
+- Barra superior: «Recientes» pasó al submenú nativo «Archivo ▸ Abrir
+  reciente» (`set_recent_files`) y «Esquema» a un panel lateral opcional con
+  botón, para que la barra quepa en 960 px.
+- `node_modules` debe reinstalarse (`npm ci`): `@bhsd/codemirror-wikitext`
+  faltaba y `npm run vendor` abortaba sin generar `editor.js`.
+
+Pendiente y documentado en el informe de la sesión: desborde de la barra a
+960 px (selectores Recientes y Esquema), Mermaid `securityLevel: "loose"`,
+borrador restaurado que no recuerda el mtime original, cierre de ventana sin
+confirmación, temporal huérfano si falla el `rename`.
 
 ## Trabajo incorporado desde `v0.4.2`
 
