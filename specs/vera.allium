@@ -10,7 +10,11 @@ use "./luca.allium" as luca
 use "./documento.allium" as documento
 
 external entity Vera {
-    -- Vera Desktop, que administra los borradores y los lanza en luca.
+    -- Vera Desktop, que administra los borradores y los lanza en luca. Es el
+    -- otro lado de un límite real —otro programa, con sus propias reglas— pero
+    -- del mismo autor y en la misma máquina: luca no la autentica ni distingue
+    -- instancias, sólo recibe la ruta de un archivo. De ahí que su identidad
+    -- esté declarada y no se consulte.
     id: String
 }
 
@@ -68,7 +72,5 @@ surface LanzamientoVera {
 open question "Vista previa *renderizada* (Markdown + Mermaid) al pulsar Espacio, por SO: Quick Look .appex en macOS (requiere Xcode + firma; Tauri no lo genera), Preview Handler en Windows, thumbnailer/Sushi en Linux. Diferido."
 
 open question "CLI 'luca --wait <ruta>' para que Vera conozca la vida de la ventana (no determina la aceptación en Vera)."
-
-open question "Resolver rutas relativas de assets (../assets/img.png) en la vista previa, conservando la referencia literal al guardar. Pendiente de implementar."
 
 open question "Protocolo mayor con Vera (deep-link vera:// o JSON-RPC de abierto/cerrado) sólo cuando haya una necesidad concreta."

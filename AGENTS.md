@@ -11,7 +11,11 @@ HTML/CSS/JavaScript sin framework. Lee `README.md` y `CONTRIBUTING.md` como cont
 - Una autorización para documentación o assets no autoriza cambios de código.
   No reformatees, limpies archivos ni reviertas cambios ajenos como tarea lateral.
 - Prefiere cambios pequeños, patrones existentes y dependencias ya instaladas.
-- Mantén la documentación y los mensajes de interfaz en español.
+- Mantén la documentación en español.
+- Los textos de interfaz viven en `ui/i18n.js`, no en el marcado ni en el código.
+  El español es la fuente y el inglés su traducción: toda cadena nueva se añade a
+  los dos catálogos. El menú nativo no tiene catálogo en Rust — el frontend le
+  envía las etiquetas — y los errores de Rust viajan como claves `err.*`.
 
 ## Descubrimiento del código
 
@@ -40,6 +44,7 @@ archivos no indexados, o si el grafo no devuelve información suficiente.
 | `ui/editor.src.js` | `createMarkdownEditor`, API del editor CodeMirror 6, temas y medición tipográfica. Se empaqueta; no se importa directamente en el navegador. |
 | `ui/block-edit.js` | Edición por bloques en la vista renderizada: abre un bloque con su Markdown in situ, sincroniza su rango con el documento y lo cierra. |
 | `ui/toolbar.js`, `ui/table-editor.js` | Barra de herramientas y editor visual de tablas. Leen `doc.format` en cada acción y emiten Markdown o Wikitext. |
+| `ui/i18n.js` | Catálogo de interfaz (es/en), `t()`, detección de idioma, `translatePage` y las etiquetas que Rust usa para el menú nativo. Única fuente de texto de la app. |
 | `ui/format-syntax.js` | Sintaxis por formato (inline, encabezados, listas, bloques, enlaces). Módulo puro con tests en Node. |
 | `ui/markdown-table.js`, `ui/wikitext-table.js` | Lectura y escritura de tablas Markdown (`\|`) y Wikitext (`{\| … \|}`) sobre el mismo modelo. |
 | `ui/index.html` | DOM, estilos, tokens de Vera, fuentes locales, modos source/split/rendered, zen e impresión. |

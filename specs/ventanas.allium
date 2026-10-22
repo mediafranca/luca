@@ -28,12 +28,29 @@ rule TransferirDocumento {
         -- pestaña y su estado íntegro.
 }
 
+rule ReunirVentanas {
+    -- Traer a una sola ventana las pestañas repartidas entre varias. Es
+    -- TransferirDocumento aplicado a todo lo abierto, no una operación aparte:
+    -- cada pestaña llega con su estado o se queda donde está.
+    when: AutorReuneVentanas(autor, destino)
+
+    requires: exists destino
+
+    for d in Documentos where espacio != destino:
+        ensures: AutorMueveDocumento(documento: d, destino: destino)
+
+    @guarantee ReunirNoPierdeNada
+        -- Una transferencia que falle deja su pestaña en la ventana de origen
+        -- con el estado íntegro (RecuperacionAnteFallo) y no aborta las demás.
+}
+
 surface GestionDeVentanas {
     facing autor: luca/Autor
 
     provides:
         AutorCreaVentana(autor)
         AutorMueveDocumento(documento, destino)
+        AutorReuneVentanas(autor, destino)
 
     @guarantee VentanaExplicita
         -- La ventana única es el comportamiento normal. Crear, separar o reunir

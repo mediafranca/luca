@@ -1,25 +1,46 @@
 // luca — Markdown + Mermaid con recursos locales.
 
 import { createMarkdownEditor } from "./vendor/codemirror/editor.js";
+import { AUTO, detectLanguage, language, menuLabels, setLanguage, t, translatePage } from "./i18n.js";
 import { createEditorToolbar, editDocumentTableAtIndex } from "./toolbar.js";
 import { icon } from "./icons.js";
 import { beginBlockEdit, exitBlockEdit } from "./block-edit.js";
-import { externalWebUrl, isEditablePreviewMode, isInternalAnchor } from "./preview-behavior.js";
+import { externalWebUrl, isEditablePreviewMode, isInternalAnchor, scopeWikiCss } from "./preview-behavior.js";
 import { moveByOffset, reorderById } from "./tab-order.js";
 import { extensionMismatch, interpretedFormat } from "./document-format.js";
 import DOMPurify from "./vendor/dompurify/purify.es.mjs";
 import { recentPaths, sessionSnapshot, validSession } from "./session-state.js";
 import { matchingCommands } from "./command-search.js";
 import { detectedLineEnding, documentHeadings } from "./document-outline.js";
-import { diagnosticReport, migrateSettings } from "./settings-state.js";
+import { DEFAULT_DESIGN_NAME, DESIGNS_KEY, TOKENS_KEY, diagnosticReport, migrateSettings, uniqueDesignName }
+  from "./settings-state.js";
 import { isDisposableBlank, transferableTab } from "./window-transfer.js";
 
 try { migrateSettings(localStorage); } catch {}
+
+// El idioma se fija antes de que nada se dibuje: así todo rótulo —y el menú
+// nativo, que Rust arma con lo que le enviemos— sale ya en el idioma correcto.
+const LANG_KEY = "luca.lang";
+const storedLanguage = () => {
+  try { return localStorage.getItem(LANG_KEY) || AUTO; } catch { return AUTO; }
+};
+const resolveLanguage = (choice = storedLanguage()) =>
+  choice === AUTO ? detectLanguage(navigator.languages ?? [navigator.language]) : choice;
+setLanguage(resolveLanguage());
 
 const PREVIEW_SANITIZE_OPTIONS = {
   USE_PROFILES: { html: true },
   FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "meta", "link", "base"],
   FORBID_ATTR: ["style", "srcset"],
+};
+// Con las CSS de la wiki activadas, el HTML conserva sus <style> (TemplateStyles
+// viaja ahí) pero sigue sin scripts, formularios ni marcos: el contenido vive
+// aislado en un shadow root y la hoja no puede ejecutar nada.
+const PREVIEW_SANITIZE_STYLED = {
+  USE_PROFILES: { html: true },
+  ADD_TAGS: ["style"],
+  FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "button", "meta", "link", "base"],
+  FORBID_ATTR: ["srcset"],
 };
 
 let marked;
@@ -156,7 +177,7 @@ async function openRecent(index) {
   const path = readJsonStorage(RECENT_KEY, [])[index];
   if (!path) return;
   try { await openPath(path); }
-  catch { alert(`No se pudo abrir el archivo reciente:\n${path}`); }
+  catch { alert(t("dialog.recent_failed", { path })); }
 }
 function clearRecent() {
   try { localStorage.removeItem(RECENT_KEY); } catch {}
@@ -172,9 +193,48 @@ const formatSelectionFor = (path) => path ? (readFormatOverrides()[path] || "aut
 const newDocumentFormat = () => {
   try { return localStorage.getItem(NEW_FORMAT_KEY) || "markdown"; } catch { return "markdown"; }
 };
+// ---------- Servidores de wiki para la vista previa Wikitext ----------
+// Wikitext sólo lo interpreta MediaWiki, así que la preview se le pide a una
+// instalación concreta: cualquiera con api.php pública sirve. La lista se
+// guarda local, como el resto de las preferencias.
+const WIKI_SERVERS_KEY = "luca.wikiServers";
+const WIKI_API_KEY = "luca.wikiApi";
+const WIKI_STYLES_KEY = "luca.wikiStyles";
+const WIKI_STYLE_MODULES_KEY = "luca.wikiStyleModules";
+const DEFAULT_WIKI_SERVERS = [
+  { name: "Casiopea (e[ad] PUCV)", api: "https://wiki.ead.pucv.cl/api.php" },
+  { name: "Wikipedia (es)", api: "https://es.wikipedia.org/w/api.php" },
+  { name: "Wikipedia (en)", api: "https://en.wikipedia.org/w/api.php" },
+  { name: "Wikimedia Commons", api: "https://commons.wikimedia.org/w/api.php" },
+];
+function wikiServers() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WIKI_SERVERS_KEY) || "null");
+    const list = (Array.isArray(saved) ? saved : [])
+      .filter((server) => server && typeof server.api === "string" && server.api.startsWith("https://"))
+      .map((server) => ({ name: String(server.name || server.api), api: server.api }));
+    if (list.length) return list;
+  } catch {}
+  return DEFAULT_WIKI_SERVERS.map((server) => ({ ...server }));
+}
+const saveWikiServers = (list) => {
+  try { localStorage.setItem(WIKI_SERVERS_KEY, JSON.stringify(list)); } catch {}
+};
 const wikiApi = () => {
-  try { return localStorage.getItem("luca.wikiApi") || "https://wiki.ead.pucv.cl/api.php"; }
-  catch { return "https://wiki.ead.pucv.cl/api.php"; }
+  try { return localStorage.getItem(WIKI_API_KEY) || wikiServers()[0].api; }
+  catch { return DEFAULT_WIKI_SERVERS[0].api; }
+};
+const wikiServerLabel = (api = wikiApi()) => {
+  const saved = wikiServers().find((server) => server.api === api);
+  if (saved) return saved.name;
+  try { return new URL(api).host; } catch { return api; }
+};
+const wikiStylesOn = () => {
+  try { return localStorage.getItem(WIKI_STYLES_KEY) === "on"; } catch { return false; }
+};
+const wikiExtraModules = () => {
+  try { return (localStorage.getItem(WIKI_STYLE_MODULES_KEY) || "").split(/[\s,|]+/).filter(Boolean); }
+  catch { return []; }
 };
 const wikiTitle = (doc) => {
   try { return localStorage.getItem("luca.wikiTitle") || baseName(doc.path).replace(/\.[^.]+$/, "") || "Luca/Preview"; }
@@ -198,7 +258,7 @@ document.getElementById("modes").after(createEditorToolbar({
 }));
 
 const dark = () => isCurrentDark();
-const baseName = (p) => (p ? p.split(/[\\/]/).pop() : "sin título");
+const baseName = (p) => (p ? p.split(/[\\/]/).pop() : t("ui.tab.untitled"));
 
 async function setTitle() {
   const name = active ? `${baseName(active.path)}${active.dirty ? " •" : ""}` : "Luca";
@@ -264,49 +324,119 @@ function renderBlocks(src) {
   return out.content;
 }
 
+// ---------- Vista previa Wikitext: HTML y estilos de la wiki ----------
+const wikiNotice = (text) => {
+  const el = document.createElement("p");
+  el.className = "wiki-preview-status";
+  el.textContent = text;
+  return el;
+};
+
+// El HTML de MediaWiki trae rutas relativas a la wiki; aquí se resuelven y se
+// descarta cualquier esquema que no sea http(s).
+function absolutizeWikiUrls(fragment, api) {
+  let origin;
+  try { origin = new URL(api).origin; } catch { return; }
+  for (const el of fragment.querySelectorAll("[href], [src]")) {
+    for (const attr of ["href", "src"]) {
+      const raw = el.getAttribute(attr);
+      if (!raw) continue;
+      try {
+        const resolved = new URL(raw, origin);
+        if (!["http:", "https:"].includes(resolved.protocol)) el.removeAttribute(attr);
+        else el.setAttribute(attr, resolved.href);
+      } catch { el.removeAttribute(attr); }
+    }
+  }
+}
+
+// Base mínima dentro del shadow root: la hoja de la wiki viene después y manda.
+const WIKI_SHADOW_BASE = `:host { display:block; }
+.wiki-body { background:#fff; color:#202122;
+  font-family:var(--font-read, 'IBM Plex Sans', system-ui, sans-serif); font-size:14px;
+  line-height:1.6; min-height:100%; box-sizing:border-box;
+  padding:1.6em max(1.6em, calc((100% - 52em) / 2)); }
+.wiki-body img { max-width:100%; height:auto; }
+`;
+
+// Un pedido de load.php por endpoint y lista de módulos; el fallo se cachea
+// como hoja vacía para no reintentar en cada tecla.
+const wikiStyleSheets = new Map();
+function wikiStyleSheet(api, modules) {
+  const list = [...new Set(["site.styles", ...modules, ...wikiExtraModules()])];
+  const key = `${api}\n${list.join("|")}`;
+  if (!wikiStyleSheets.has(key)) {
+    wikiStyleSheets.set(key, TAURI.core.invoke("fetch_wiki_styles", { apiUrl: api, modules: list })
+      .then((css) => {
+        let origin = "";
+        try { origin = new URL(api).origin; } catch {}
+        return scopeWikiCss(css.replace(/url\((\s*['"]?)\/(?!\/)/g, (_, quote) => `url(${quote}${origin}/`));
+      })
+      .catch(() => ""));
+  }
+  return wikiStyleSheets.get(key);
+}
+
+async function showWikiHtml(doc, cache, renderVersion) {
+  const template = document.createElement("template");
+  template.innerHTML = cache.html;
+  if (!wikiStylesOn()) {
+    doc.previewEl.replaceChildren(template.content);
+    return;
+  }
+  const css = await wikiStyleSheet(cache.api, cache.modules);
+  if (renderVersion !== doc.renderVersion) return;
+  const host = document.createElement("div");
+  host.className = "wiki-styled";
+  const style = document.createElement("style");
+  style.textContent = WIKI_SHADOW_BASE + css;
+  const body = document.createElement("div");
+  body.className = "wiki-body mw-body-content";
+  body.append(template.content);
+  host.attachShadow({ mode: "open" }).append(style, body);
+  doc.previewEl.setAttribute("data-wiki-styles", "");
+  doc.previewEl.replaceChildren(host);
+}
+
 async function renderDoc(doc, force = false) {
   if (doc.block) return;   // hay un bloque en edición: se renderiza al salir
   if (!force && document.body.dataset.mode === "source") return;
   const renderVersion = ++doc.renderVersion;
+  // La bandera sólo la pone showWikiHtml cuando de verdad aplica las CSS de la
+  // wiki: aquí se limpia para que no sobreviva a un cambio de formato ni al
+  // apagar el interruptor (con ella puesta, el panel va sin su medida).
+  doc.previewEl.removeAttribute("data-wiki-styles");
   if (doc.format === "wikitext") {
     const api = wikiApi();
-    const status = document.createElement("p");
-    status.className = "wiki-preview-status";
-    status.textContent = `Actualizando mediante ${api}…`;
-    doc.previewEl.replaceChildren(status);
     if (!TAURI) {
-      status.textContent = `Preview Wikitext no disponible fuera de Tauri · ${api}`;
+      setWikiState(doc, "unavailable", "wiki.state.unavailable");
+      doc.previewEl.replaceChildren(wikiNotice(t("wiki.notice.browser", { api })));
       return;
     }
+    setWikiState(doc, "loading", "wiki.state.loading");
     try {
-      const html = await TAURI.core.invoke("parse_wikitext", { apiUrl: api, title: wikiTitle(doc), text: doc.ed.getDoc() });
+      const parsed = await TAURI.core.invoke("parse_wikitext", { apiUrl: api, title: wikiTitle(doc), text: doc.ed.getDoc() });
       if (renderVersion !== doc.renderVersion) return;
-      const clean = DOMPurify.sanitize(html, PREVIEW_SANITIZE_OPTIONS);
+      const styled = wikiStylesOn();
+      const clean = DOMPurify.sanitize(parsed.html, styled ? PREVIEW_SANITIZE_STYLED : PREVIEW_SANITIZE_OPTIONS);
       const template = document.createElement("template");
       template.innerHTML = clean;
-      const origin = new URL(api).origin;
-      for (const el of template.content.querySelectorAll("[href], [src]")) {
-        for (const attr of ["href", "src"]) {
-          const raw = el.getAttribute(attr);
-          if (!raw) continue;
-          try {
-            const resolved = new URL(raw, origin);
-            if (!["http:", "https:"].includes(resolved.protocol)) el.removeAttribute(attr);
-            else el.setAttribute(attr, resolved.href);
-          } catch { el.removeAttribute(attr); }
-        }
-      }
-      doc.wikiCache = template.innerHTML;
-      status.textContent = `Vista actual · ${api}`;
-      doc.previewEl.replaceChildren(status, template.content.cloneNode(true));
+      absolutizeWikiUrls(template.content, api);
+      doc.wikiCache = { api, html: template.innerHTML, modules: parsed.modules ?? [] };
+      await showWikiHtml(doc, doc.wikiCache, renderVersion);
+      if (renderVersion !== doc.renderVersion) return;
+      setWikiState(doc, "ok", "wiki.state.ok");
     } catch (error) {
       if (renderVersion !== doc.renderVersion) return;
-      status.textContent = `${navigator.onLine ? "Error" : "Sin conexión"} · ${api} · ${error}`;
-      if (doc.wikiCache) {
-        const cached = document.createElement("template");
-        cached.innerHTML = doc.wikiCache;
-        status.textContent += " · mostrando respuesta en caché";
-        doc.previewEl.replaceChildren(status, cached.content.cloneNode(true));
+      const reason = t(navigator.onLine ? "wiki.reason.error" : "wiki.reason.offline", { error });
+      if (doc.wikiCache?.api === api) {
+        await showWikiHtml(doc, doc.wikiCache, renderVersion);
+        if (renderVersion !== doc.renderVersion) return;
+        setWikiState(doc, "cache", "wiki.state.cache", { reason });
+      } else {
+        doc.previewEl.replaceChildren(wikiNotice(t("wiki.notice.none", { api, reason })));
+        setWikiState(doc, navigator.onLine ? "error" : "offline",
+          navigator.onLine ? "wiki.reason.error" : "wiki.reason.offline", { error });
       }
     }
     return;
@@ -332,7 +462,7 @@ async function renderDoc(doc, force = false) {
         el.src = toAssetUrl(allowedPath);
       } catch {
         el.removeAttribute("src");
-        el.title = "Recurso local no disponible o no permitido";
+        el.title = t("preview.asset_blocked");
       }
     }
   }
@@ -346,7 +476,7 @@ async function renderDoc(doc, force = false) {
       bindFunctions?.(block);
     } catch (err) {
       block.className = "mermaid-error";
-      block.textContent = `⚠ Mermaid: ${err?.message ?? err}`;
+      block.textContent = t("preview.mermaid_error", { error: err?.message ?? err });
     }
   }
 
@@ -363,7 +493,7 @@ async function renderDoc(doc, force = false) {
     editBtn.type = "button";
     editBtn.className = "preview-edit-table";
     editBtn.innerHTML = `${icon("grid")} Editar tabla`;
-    editBtn.title = "Editar visualmente esta tabla";
+    editBtn.title = t("table.edit");
     editBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       editDocumentTableAtIndex(doc, tableIndex);
@@ -392,21 +522,24 @@ function renderTabs() {
     tab.ariaSelected = doc === active ? "true" : "false";
     tab.setAttribute("aria-controls", `editor-${doc.id}`);
     tab.draggable = true;
-    tab.title = doc.path ?? "sin guardar";
+    tab.title = doc.path ?? t("ui.tab.unsaved");
     const label = document.createElement("span");
     label.className = "label";
     label.textContent = (doc.dirty ? "• " : "") + baseName(doc.path);
     const close = document.createElement("button");
     close.className = "close";
     close.textContent = "×";
-    close.title = "Cerrar";
-    close.setAttribute("aria-label", `Cerrar ${baseName(doc.path)}`);
-    // El mousedown del tab activa y redibuja las pestañas, lo que destruiría este botón
-    // antes del click: el × no lo propaga.
+    close.title = t("ui.tab.close");
+    close.setAttribute("aria-label", t("ui.tab.close_named", { name: baseName(doc.path) }));
+    // Activar redibuja las pestañas y destruiría este botón: el × no propaga
+    // ni el mousedown ni el click, así cerrar no activa primero.
     close.addEventListener("mousedown", (e) => e.stopPropagation());
     close.addEventListener("click", (e) => { e.stopPropagation(); closeDoc(doc); });
     tab.append(label, close);
-    tab.addEventListener("mousedown", () => activate(doc));
+    // En click, no en mousedown: activate() rehace la barra de pestañas y, si
+    // el nodo muere durante el gesto, el arrastre para reordenar no arranca.
+    // Un arrastre consumado no emite click, así que soltar no activa de más.
+    tab.addEventListener("click", () => activate(doc));
     tab.addEventListener("keydown", (e) => {
       if (!e.altKey && !e.shiftKey && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
         e.preventDefault();
@@ -525,10 +658,10 @@ function makeDoc(initialDoc, path, selection = null, restored = {}) {
 
   editorEl.id = `editor-${doc.id}`;
   editorEl.setAttribute("role", "tabpanel");
-  editorEl.setAttribute("aria-label", `Editor de ${baseName(path)}`);
+  editorEl.setAttribute("aria-label", t("ui.editor_of", { name: baseName(path) }));
   previewEl.id = `preview-${doc.id}`;
   previewEl.setAttribute("role", "region");
-  previewEl.setAttribute("aria-label", `Vista previa de ${baseName(path)}`);
+  previewEl.setAttribute("aria-label", t("ui.preview_of", { name: baseName(path) }));
 
   doc.ed = createMarkdownEditor({
     parent: cmMount,
@@ -571,7 +704,7 @@ async function openPath(path) {
 }
 
 async function openFile() {
-  const path = await TAURI.dialog.open({ filters: [{ name: "Texto marcado", extensions: ["md", "markdown", "wiki", "wikitext", "txt"] }] });
+  const path = await TAURI.dialog.open({ filters: [{ name: t("dialog.filter.markup"), extensions: ["md", "markdown", "wiki", "wikitext", "txt"] }] });
   if (typeof path === "string") await openPath(path);
 }
 
@@ -581,7 +714,7 @@ async function saveDoc(doc, forceDialog = false) {
   const isNew = forceDialog || !path;
   if (isNew) {
     const ext = doc.format === "wikitext" ? "wiki" : "md";
-    path = await TAURI.dialog.save({ defaultPath: doc.path ?? `sin título.${ext}`, filters: [{ name: "Texto marcado", extensions: ["md", "markdown", "wiki", "wikitext"] }] });
+    path = await TAURI.dialog.save({ defaultPath: doc.path ?? `${t("dialog.untitled_file")}.${ext}`, filters: [{ name: t("dialog.filter.markup"), extensions: ["md", "markdown", "wiki", "wikitext"] }] });
     if (!path) return;
   } else {
     // ¿cambió fuera de luca (p.ej. Vera) desde que lo leímos? No pisar en silencio.
@@ -589,7 +722,7 @@ async function saveDoc(doc, forceDialog = false) {
     if (cur !== null && doc.lastMtime !== null && cur !== doc.lastMtime &&
         // En Tauri el plugin de diálogos vuelve confirm() asíncrono: sin await la
         // condición nunca bloquea y se sobrescribe antes de que el autor responda.
-        !(await confirm("El archivo cambió fuera de luca. ¿Sobrescribir?"))) return;
+        !(await confirm(t("dialog.external_change")))) return;
   }
   const claimsNewPath = Boolean(TAURI && path !== previousPath);
   if (claimsNewPath) {
@@ -621,7 +754,7 @@ async function saveDoc(doc, forceDialog = false) {
 const newDoc = () => makeDoc("", null, newDocumentFormat());
 
 async function closeDoc(doc, { force = false, release = true, replacement = true } = {}) {
-  if (!force && doc.dirty && !(await confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`))) return false;
+  if (!force && doc.dirty && !(await confirm(t("dialog.unsaved", { name: baseName(doc.path) })))) return false;
   const i = docs.indexOf(doc);
   exitBlockEdit(doc, false);
   doc.editorEl.remove();
@@ -679,6 +812,10 @@ addEventListener(
     else if (e.key === "2") { e.preventDefault(); applyMode("split"); }
     else if (e.key === "3") { e.preventDefault(); applyMode("rendered"); }
     else if (e.key === ",") { e.preventDefault(); openPrefs(); }
+    // El menú nativo ya trae CmdOrCtrl+E, pero en macOS eso es sólo ⌘E y
+    // CodeMirror se queda con Ctrl+E (fin de línea, estilo emacs). Aquí valen
+    // los dos; exportPdf se protege de una segunda llamada.
+    else if (k === "e") { e.preventDefault(); exportPdf(); }
   },
   true
 );
@@ -722,27 +859,57 @@ if (TAURI) {
 // ---------- Vista dividida: proporción arrastrable y scroll a la par ----------
 const workspaceEl = document.getElementById("workspace");
 const dividerEl = document.getElementById("divider");
+const outlineDividerEl = document.getElementById("outlineDivider");
+
+// Arrastre de una columna del área de trabajo: el divisor captura el puntero y
+// al soltar se guarda la medida y se remide la tipografía del editor.
+function dragColumn(divider, { move, reset }) {
+  if (!divider) return;
+  divider.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    divider.setPointerCapture(e.pointerId);
+    const rect = workspaceEl.getBoundingClientRect();
+    const onMove = (ev) => move(ev, rect);
+    const onUp = () => {
+      divider.removeEventListener("pointermove", onMove);
+      divider.removeEventListener("pointerup", onUp);
+      active?.ed.remeasure();
+    };
+    divider.addEventListener("pointermove", onMove);
+    divider.addEventListener("pointerup", onUp);
+  });
+  divider.addEventListener("dblclick", () => { reset(); active?.ed.remeasure(); });
+}
+
 try { const s = localStorage.getItem("luca.split"); if (s) workspaceEl.style.setProperty("--split", s); } catch {}
-dividerEl.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  dividerEl.setPointerCapture(e.pointerId);
-  const rect = workspaceEl.getBoundingClientRect();
-  const move = (ev) => {
-    const pct = Math.min(80, Math.max(20, ((ev.clientX - rect.left) / rect.width) * 100));
+dragColumn(dividerEl, {
+  move: (ev, rect) => {
+    const outline = outlineDividerEl && !outlineDividerEl.offsetParent ? 0 : (outlineEl?.offsetWidth ?? 0);
+    const left = rect.left + outline;
+    const width = rect.width - outline;
+    const pct = Math.min(80, Math.max(20, ((ev.clientX - left) / width) * 100));
     workspaceEl.style.setProperty("--split", `${pct.toFixed(1)}%`);
-  };
-  const up = () => {
-    dividerEl.removeEventListener("pointermove", move);
-    dividerEl.removeEventListener("pointerup", up);
     try { localStorage.setItem("luca.split", workspaceEl.style.getPropertyValue("--split")); } catch {}
-    active?.ed.remeasure();
-  };
-  dividerEl.addEventListener("pointermove", move);
-  dividerEl.addEventListener("pointerup", up);
+  },
+  reset: () => {
+    workspaceEl.style.removeProperty("--split");
+    try { localStorage.removeItem("luca.split"); } catch {}
+  },
 });
-dividerEl.addEventListener("dblclick", () => {
-  workspaceEl.style.removeProperty("--split");
-  try { localStorage.removeItem("luca.split"); } catch {}
+
+// Ancho del panel de esquema: 8–28 rem, recordado como el resto de la vista.
+const OUTLINE_WIDTH_KEY = "luca.outlineWidth";
+try { const w = localStorage.getItem(OUTLINE_WIDTH_KEY); if (w) workspaceEl.style.setProperty("--outline-w", w); } catch {}
+dragColumn(outlineDividerEl, {
+  move: (ev, rect) => {
+    const px = Math.min(448, Math.max(128, ev.clientX - rect.left));
+    workspaceEl.style.setProperty("--outline-w", `${Math.round(px)}px`);
+    try { localStorage.setItem(OUTLINE_WIDTH_KEY, workspaceEl.style.getPropertyValue("--outline-w")); } catch {}
+  },
+  reset: () => {
+    workspaceEl.style.removeProperty("--outline-w");
+    try { localStorage.removeItem(OUTLINE_WIDTH_KEY); } catch {}
+  },
 });
 
 // ---------- Formato por documento ----------
@@ -758,9 +925,39 @@ function updateCursorStatus(doc) {
   const location = doc.ed.getCursorLocation();
   const cursor = document.getElementById("cursorStatus");
   const encoding = document.getElementById("encodingStatus");
-  if (cursor) cursor.textContent = `Línea ${location.line}, columna ${location.column}`;
-  if (encoding) encoding.textContent = `UTF-8 · ${doc.lineEnding}`;
+  if (cursor) cursor.textContent = t("status.cursor", { line: location.line, column: location.column });
+  if (encoding) encoding.textContent = t("status.encoding", { ending: doc.lineEnding });
 }
+
+// El estado de la preview Wikitext vive al pie, junto al formato: nombre de la
+// wiki y en qué está (actualizando, actual, en caché, error o sin conexión).
+// Nunca se presenta una respuesta cacheada como actual.
+const wikiStatusEl = document.getElementById("wikiStatus");
+const wikiStatusSepEl = document.getElementById("wikiStatusSep");
+
+// Se guarda la clave y sus parámetros, no el texto: así cambiar de idioma
+// vuelve a redactar el estado sin tener que volver a consultar la wiki.
+function setWikiState(doc, state, key, params) {
+  doc.wikiState = { state, key, params };
+  if (doc === active) updateWikiStatus(doc);
+}
+
+const wikiStateText = ({ key, params }) =>
+  t("wiki.status.detail", { label: wikiServerLabel(), detail: t(key, params) });
+
+function updateWikiStatus(doc) {
+  if (!wikiStatusEl) return;
+  const show = doc?.format === "wikitext" && Boolean(doc.wikiState);
+  wikiStatusEl.hidden = !show;
+  if (wikiStatusSepEl) wikiStatusSepEl.hidden = !show;
+  if (!show) return;
+  const text = wikiStateText(doc.wikiState);
+  wikiStatusEl.textContent = text;
+  wikiStatusEl.dataset.state = doc.wikiState.state;
+  wikiStatusEl.title = t("wiki.status.full", { text, api: wikiApi() });
+}
+
+wikiStatusEl?.addEventListener("click", () => openPrefs("wiki"));
 
 // Panel lateral de encabezados (apagado por defecto; botón en la barra, menú
 // Vista y paleta). Salta al encabezado elegido en el editor.
@@ -786,7 +983,7 @@ function updateOutline(doc) {
   if (!headings.length) {
     const empty = document.createElement("li");
     empty.className = "empty";
-    empty.textContent = "Sin encabezados";
+    empty.textContent = t("ui.outline.empty");
     list.append(empty);
   }
 }
@@ -810,10 +1007,11 @@ function updateFormatControls(doc) {
   if (!doc || !formatSelect) return;
   formatSelect.value = doc.formatSelection;
   formatWarning.hidden = !extensionMismatch(doc.path, doc.formatSelection);
-  formatWarning.title = formatWarning.hidden ? "" : "El formato elegido no coincide con la extensión; se guardará sin convertir.";
+  formatWarning.title = formatWarning.hidden ? "" : t("status.format.warning.detail");
   // La barra no se oculta en Wikitext: adapta su marcado al formato del documento.
   if (editorToolbar) { editorToolbar.hidden = false; editorToolbar.refresh?.(doc.format); }
   document.body.dataset.format = doc.format;
+  updateWikiStatus(doc);
   updateOutline(doc);
 }
 
@@ -860,23 +1058,23 @@ function applyMode(m) {
 
 const shortcutPrefix = navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+";
 const commandList = () => [
-  { label: "Nuevo documento", shortcut: `${shortcutPrefix}N`, run: newDoc },
-  { label: "Nueva ventana", shortcut: `${shortcutPrefix}Shift+N`, run: () => TAURI?.core.invoke("create_editor_window") },
-  { label: "Mover pestaña a nueva ventana", shortcut: `${shortcutPrefix}Shift+M`, run: () => moveTabToWindow(active) },
-  { label: "Abrir archivo", shortcut: `${shortcutPrefix}O`, run: openFile },
-  { label: "Guardar", shortcut: `${shortcutPrefix}S`, run: () => active && saveDoc(active) },
-  { label: "Guardar como", shortcut: `${shortcutPrefix}Shift+S`, run: () => active && saveDoc(active, true) },
-  { label: "Cerrar pestaña", shortcut: `${shortcutPrefix}W`, run: () => active && closeDoc(active) },
-  { label: "Buscar y reemplazar", shortcut: `${shortcutPrefix}F`, run: () => active?.ed.openSearch() },
-  { label: "Seleccionar todas las apariciones", shortcut: `${shortcutPrefix}Shift+L`, run: () => active?.ed.selectAllMatches() },
-  { label: "Ir a línea", shortcut: `${shortcutPrefix}Alt+G`, run: () => active?.ed.gotoLine() },
-  { label: "Vista de código", shortcut: `${shortcutPrefix}1`, run: () => applyMode("source") },
-  { label: "Vista dividida", shortcut: `${shortcutPrefix}2`, run: () => applyMode("split") },
-  { label: "Texto renderizado", shortcut: `${shortcutPrefix}3`, run: () => applyMode("rendered") },
-  { label: "Modo zen", shortcut: `${shortcutPrefix}Shift+Z`, run: () => toggleZen() },
-  { label: "Esquema de encabezados", shortcut: "", run: () => toggleOutline() },
-  { label: "Preferencias", shortcut: `${shortcutPrefix},`, run: openPrefs },
-  { label: "Exportar PDF", shortcut: `${shortcutPrefix}E`, run: exportPdf },
+  { label: t("cmd.new"), shortcut: `${shortcutPrefix}N`, run: newDoc },
+  { label: t("cmd.new_window"), shortcut: `${shortcutPrefix}Shift+N`, run: () => TAURI?.core.invoke("create_editor_window") },
+  { label: t("cmd.detach"), shortcut: `${shortcutPrefix}Shift+M`, run: () => moveTabToWindow(active) },
+  { label: t("cmd.open"), shortcut: `${shortcutPrefix}O`, run: openFile },
+  { label: t("cmd.save"), shortcut: `${shortcutPrefix}S`, run: () => active && saveDoc(active) },
+  { label: t("cmd.save_as"), shortcut: `${shortcutPrefix}Shift+S`, run: () => active && saveDoc(active, true) },
+  { label: t("cmd.close_tab"), shortcut: `${shortcutPrefix}W`, run: () => active && closeDoc(active) },
+  { label: t("cmd.find"), shortcut: `${shortcutPrefix}F`, run: () => active?.ed.openSearch() },
+  { label: t("cmd.select_all_matches"), shortcut: `${shortcutPrefix}Shift+L`, run: () => active?.ed.selectAllMatches() },
+  { label: t("cmd.goto_line"), shortcut: `${shortcutPrefix}Alt+G`, run: () => active?.ed.gotoLine() },
+  { label: t("cmd.mode_source"), shortcut: `${shortcutPrefix}1`, run: () => applyMode("source") },
+  { label: t("cmd.mode_split"), shortcut: `${shortcutPrefix}2`, run: () => applyMode("split") },
+  { label: t("cmd.mode_rendered"), shortcut: `${shortcutPrefix}3`, run: () => applyMode("rendered") },
+  { label: t("cmd.zen"), shortcut: `${shortcutPrefix}Shift+Z`, run: () => toggleZen() },
+  { label: t("cmd.outline"), shortcut: "", run: () => toggleOutline() },
+  { label: t("cmd.prefs"), shortcut: `${shortcutPrefix},`, run: openPrefs },
+  { label: t("cmd.export_pdf"), shortcut: `${shortcutPrefix}E`, run: exportPdf },
 ];
 
 const paletteEl = document.getElementById("commandPalette");
@@ -983,7 +1181,7 @@ async function toggleZen(force) {
   if (zenBtn) {
     zenBtn.classList.toggle("active", on);
     zenBtn.innerHTML = icon(on ? "minimize" : "maximize");
-    zenBtn.title = on ? "Salir del modo zen · Esc o ⌘⇧Z" : "Modo zen (pantalla completa) · ⌘⇧Z";
+    zenBtn.title = t(on ? "ui.zen.exit" : "ui.zen.title", { key: shortcutPrefix });
   }
 
   if (TAURI?.window) {
@@ -1074,13 +1272,36 @@ function initTopbarButtons() {
 // Exportar a PDF: @media print en index.html deja sólo la vista previa activa;
 // el diálogo de impresión de macOS ofrece «Guardar como PDF».
 // macOS imprime con márgenes reales desde Rust; el resto de plataformas usa el diálogo del webview.
+// Los colores de un diagrama Mermaid se hornean en el SVG al renderizarlo: con
+// el tema oscuro el papel recibe trazos claros sobre blanco y el diagrama queda
+// invisible. Para imprimir se fuerza la paleta clara, se vuelve a renderizar y
+// al salir del diálogo se restituye el tema de la pantalla.
+let pdfBusy = false;
 async function exportPdf() {
-  if (active) await renderDoc(active, true);
+  if (!active || pdfBusy) return;
+  pdfBusy = true;
+  const root = document.documentElement;
+  const prevTheme = root.getAttribute("data-theme");
+  // Wikitext no lleva Mermaid: no vale un segundo viaje a la wiki por el tema.
+  const toLight = isCurrentDark() && active.format !== "wikitext";
   // En macOS los márgenes los pone NSPrintInfo; @page se anula para que no se sumen.
   const st = document.createElement("style");
   st.textContent = "@page { margin:0 }";
-  document.head.append(st);
-  try { await TAURI.core.invoke("print_with_margins"); } catch { st.remove(); window.print(); }
+  try {
+    if (toLight) { root.setAttribute("data-theme", "light"); initMermaid(); }
+    await renderDoc(active, true);
+    document.head.append(st);
+    try { await TAURI.core.invoke("print_with_margins"); } catch { window.print(); }
+  } finally {
+    st.remove();
+    if (toLight) {
+      if (prevTheme === null) root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", prevTheme);
+      initMermaid();
+      renderDoc(active, true);
+    }
+    pdfBusy = false;
+  }
 }
 
 // ---------- Sistema de Diseño y Tokens (Vera) ----------
@@ -1141,78 +1362,114 @@ const FONT_STACKS = [
 
 // Código y lectura se ajustan por separado: fuente, tamaño y ancho de columna.
 const GENERAL_TOKENS_META = [
-  { group: "Código" },
-  { name: "--font-mono", label: "Fuente", kind: "font" },
-  { name: "--code-size", label: "Tamaño de texto", kind: "text" },
-  { name: "--code-width", label: "Ancho de columna", kind: "text" },
-  { group: "Lectura (vista previa)" },
-  { name: "--font-read", label: "Fuente", kind: "font" },
-  { name: "--text-size", label: "Tamaño de texto", kind: "text" },
-  { name: "--line-height", label: "Interlínea", kind: "text" },
-  { name: "--content-width", label: "Ancho de columna", kind: "text" },
-  { group: "Interfaz" },
-  { name: "--font-body", label: "Cuerpo general", kind: "font" },
-  { name: "--font-ui", label: "Interfaz", kind: "font" },
+  { group: "token.group.code" },
+  { name: "--font-mono", label: "token.font", kind: "font" },
+  { name: "--code-size", label: "token.text_size", kind: "text" },
+  { name: "--code-width", label: "token.column_width", kind: "text" },
+  { group: "token.group.read" },
+  { name: "--font-read", label: "token.font", kind: "font" },
+  { name: "--text-size", label: "token.text_size", kind: "text" },
+  { name: "--line-height", label: "token.line_height", kind: "text" },
+  { name: "--content-width", label: "token.column_width", kind: "text" },
+  { group: "token.group.ui" },
+  { name: "--font-body", label: "token.font.body", kind: "font" },
+  { name: "--font-ui", label: "token.font.ui", kind: "font" },
 ];
 
 const COLOR_TOKENS_META = [
-  { group: "Entorno general" },
-  { name: "--bg", label: "Fondo de aplicación" },
-  { name: "--bg-raised", label: "Fondo barras / paneles" },
-  { name: "--text", label: "Texto de aplicación" },
-  { name: "--text-dim", label: "Texto tenue / metadatos" },
-  { name: "--rule", label: "Líneas divisorias y bordes" },
-  { name: "--accent", label: "Color de acento (también enlaces y énfasis)" },
+  { group: "token.group.app" },
+  { name: "--bg", label: "token.bg" },
+  { name: "--bg-raised", label: "token.bg_raised" },
+  { name: "--text", label: "token.text" },
+  { name: "--text-dim", label: "token.text_dim" },
+  { name: "--rule", label: "token.rule" },
+  { name: "--accent", label: "token.accent" },
 
-  { group: "Editor de código (Code)" },
-  { name: "--code-bg", label: "Fondo del editor de código" },
-  { name: "--code-text", label: "Texto del editor de código" },
+  { group: "token.group.editor" },
+  { name: "--code-bg", label: "token.code_bg" },
+  { name: "--code-text", label: "token.code_text" },
 
-  { group: "Vista previa / Lectura (Preview)" },
-  { name: "--preview-bg", label: "Fondo de vista previa" },
-  { name: "--preview-text", label: "Texto de vista previa" },
+  { group: "token.group.preview" },
+  { name: "--preview-bg", label: "token.preview_bg" },
+  { name: "--preview-text", label: "token.preview_text" },
 ];
 
-function loadTokens(held = localStorage.getItem("luca.tokens")) {
-  if (!held) {
-    return {
-      general: { ...VERA_DEFAULTS.general },
-      light: { ...VERA_DEFAULTS.light },
-      dark: { ...VERA_DEFAULTS.dark },
-      scheme: localStorage.getItem("luca.scheme") || "system",
-    };
-  }
+const KNOWN_SCHEMES = new Set(["system", "light", "dark"]);
+const storedScheme = () => {
   try {
-    const parsed = JSON.parse(held);
-    if (!parsed.general && !parsed.light && !parsed.dark) {
-      // Compatibilidad con versiones previas planas
-      const general = { ...VERA_DEFAULTS.general };
-      const light = { ...VERA_DEFAULTS.light };
-      const dark = { ...VERA_DEFAULTS.dark };
-      for (const [k, v] of Object.entries(parsed)) {
-        if (k in general) general[k] = v;
-        if (k in light) light[k] = v;
-        if (k in dark) dark[k] = v;
-      }
-      return { general, light, dark, scheme: localStorage.getItem("luca.scheme") || "system" };
-    }
-    return {
-      general: { ...VERA_DEFAULTS.general, ...(parsed.general || {}) },
-      light: { ...VERA_DEFAULTS.light, ...(parsed.light || {}) },
-      dark: { ...VERA_DEFAULTS.dark, ...(parsed.dark || {}) },
-      scheme: parsed.scheme || localStorage.getItem("luca.scheme") || "system",
-    };
-  } catch {
-    return {
-      general: { ...VERA_DEFAULTS.general },
-      light: { ...VERA_DEFAULTS.light },
-      dark: { ...VERA_DEFAULTS.dark },
-      scheme: "system",
-    };
+    const scheme = localStorage.getItem("luca.scheme");
+    return KNOWN_SCHEMES.has(scheme) ? scheme : "system";
+  } catch { return "system"; }
+};
+
+// Un diseño importado viene de un archivo cualquiera y sus valores se escriben
+// dentro de un <style>: sólo se aceptan nombres de token conocidos y valores
+// que no puedan cerrar la declaración y colar reglas propias.
+const safeTokenValue = (value) =>
+  typeof value === "string" && value.length <= 200 && !/[{}<>;]/.test(value);
+
+function normalizeTokenGroup(group, defaults) {
+  const out = { ...defaults };
+  for (const [key, value] of Object.entries(group || {})) {
+    if (key in defaults && safeTokenValue(value)) out[key] = value.trim();
   }
+  return out;
 }
 
-let tokensState = loadTokens();
+// Acepta la forma actual (general/light/dark) y la plana antigua, que mezclaba
+// todos los tokens en un objeto: el filtro por nombre reparte cada uno.
+function normalizeTokens(source) {
+  const nested = source?.general || source?.light || source?.dark;
+  const flat = source && !nested ? source : null;
+  return {
+    general: normalizeTokenGroup(flat || source?.general, VERA_DEFAULTS.general),
+    light: normalizeTokenGroup(flat || source?.light, VERA_DEFAULTS.light),
+    dark: normalizeTokenGroup(flat || source?.dark, VERA_DEFAULTS.dark),
+  };
+}
+
+function loadTokens(held = localStorage.getItem(TOKENS_KEY)) {
+  let parsed = null;
+  try { parsed = held ? JSON.parse(held) : null; } catch {}
+  if (parsed && typeof parsed !== "object") parsed = null;
+  return {
+    ...normalizeTokens(parsed),
+    scheme: KNOWN_SCHEMES.has(parsed?.scheme) ? parsed.scheme : storedScheme(),
+  };
+}
+
+// ---------- Diseños: juegos de tokens con nombre ----------
+// Un diseño es el estado gráfico completo: tipografías, medidas y los colores
+// de ambos temas. El esquema claro/oscuro no viaja con él, es del dispositivo.
+const pickTokens = ({ general, light, dark }) => ({
+  general: { ...general },
+  light: { ...light },
+  dark: { ...dark },
+});
+
+function loadDesigns() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DESIGNS_KEY) || "null");
+    const list = (Array.isArray(parsed?.list) ? parsed.list : [])
+      .filter((design) => design && typeof design.name === "string" && design.name.trim())
+      .map((design) => ({ name: design.name.trim(), ...normalizeTokens(design) }));
+    if (list.length) {
+      const active = list.some((design) => design.name === parsed.active) ? parsed.active : list[0].name;
+      return { active, list };
+    }
+  } catch {}
+  // Una lista ilegible no puede costarle al autor lo que ajustó: se reconstruye
+  // desde luca.tokens, el respaldo plano del diseño activo.
+  return { active: DEFAULT_DESIGN_NAME, list: [{ name: DEFAULT_DESIGN_NAME, ...pickTokens(loadTokens()) }] };
+}
+
+let designs = loadDesigns();
+const activeDesign = () => designs.list.find((design) => design.name === designs.active) || designs.list[0];
+const saveDesigns = () => {
+  try { localStorage.setItem(DESIGNS_KEY, JSON.stringify(designs)); } catch {}
+};
+
+let tokensState = { ...pickTokens(activeDesign()), scheme: storedScheme() };
 
 function isCurrentDark() {
   if (tokensState.scheme === "dark") return true;
@@ -1221,8 +1478,11 @@ function isCurrentDark() {
 }
 
 function saveTokens() {
+  Object.assign(activeDesign(), pickTokens(tokensState));
+  saveDesigns();
   try {
-    localStorage.setItem("luca.tokens", JSON.stringify(tokensState));
+    // Respaldo plano del diseño activo, para el caso de una lista corrupta.
+    localStorage.setItem(TOKENS_KEY, JSON.stringify(pickTokens(tokensState)));
     localStorage.setItem("luca.scheme", tokensState.scheme);
   } catch {}
 }
@@ -1279,8 +1539,15 @@ ${darkCSS}
 const prefsEl = document.getElementById("prefs");
 const aboutEl = document.getElementById("about");
 const mermaidSel = document.getElementById("mermaidTheme");
-const wikiApiInput = document.getElementById("wikiApi");
+const wikiServerSel = document.getElementById("wikiServer");
 const wikiTitleInput = document.getElementById("wikiTitle");
+const wikiServerNameInput = document.getElementById("wikiServerName");
+const wikiServerApiInput = document.getElementById("wikiServerApi");
+const wikiStylesInput = document.getElementById("wikiStyles");
+const wikiStyleModulesInput = document.getElementById("wikiStyleModules");
+const languageSel = document.getElementById("uiLanguage");
+const designListEl = document.getElementById("designList");
+const designNameInput = document.getElementById("designName");
 const tokenFormGeneral = document.getElementById("tokenFormGeneral");
 const tokenFormLight = document.getElementById("tokenFormLight");
 const tokenFormDark = document.getElementById("tokenFormDark");
@@ -1289,24 +1556,24 @@ function buildTokenForms() {
   // 1. Formulario General (Tipografía y Medida)
   if (tokenFormGeneral) {
     tokenFormGeneral.replaceChildren();
-    for (const t of GENERAL_TOKENS_META) {
-      if (t.group) {
+    for (const meta of GENERAL_TOKENS_META) {
+      if (meta.group) {
         const g = document.createElement("div");
         g.className = "prefs-group";
-        g.textContent = t.group;
+        g.textContent = t(meta.group);
         tokenFormGeneral.append(g);
         continue;
       }
       const row = document.createElement("div");
       row.className = "prefs-row";
       const span = document.createElement("span");
-      span.textContent = t.label;
+      span.textContent = t(meta.label);
       row.append(span);
 
       let input;
-      if (t.kind === "font") {
+      if (meta.kind === "font") {
         input = document.createElement("select");
-        const curVal = tokensState.general[t.name] ?? VERA_DEFAULTS.general[t.name];
+        const curVal = tokensState.general[meta.name] ?? VERA_DEFAULTS.general[meta.name];
         for (const [label, stack] of FONT_STACKS) {
           const opt = document.createElement("option");
           opt.value = stack;
@@ -1317,21 +1584,21 @@ function buildTokenForms() {
         if (!FONT_STACKS.some(([, s]) => s === curVal)) {
           const opt = document.createElement("option");
           opt.value = curVal;
-          opt.textContent = "Personalizada";
+          opt.textContent = t("prefs.font.custom");
           opt.selected = true;
           input.prepend(opt);
         }
         input.addEventListener("change", () => {
-          tokensState.general[t.name] = input.value;
+          tokensState.general[meta.name] = input.value;
           saveTokens();
           applyTokens();
         });
       } else {
         input = document.createElement("input");
         input.type = "text";
-        input.value = tokensState.general[t.name] ?? VERA_DEFAULTS.general[t.name];
+        input.value = tokensState.general[meta.name] ?? VERA_DEFAULTS.general[meta.name];
         input.addEventListener("change", () => {
-          tokensState.general[t.name] = input.value.trim();
+          tokensState.general[meta.name] = input.value.trim();
           saveTokens();
           applyTokens();
         });
@@ -1348,21 +1615,21 @@ function buildTokenForms() {
 
     const note = document.createElement("div");
     note.className = "prefs-group";
-    note.textContent = `Paleta de colores para el tema ${themeKey === "light" ? "claro" : "oscuro"}`;
+    note.textContent = t("prefs.palette.note", { theme: t(`prefs.theme.${themeKey}`) });
     container.append(note);
 
     for (const meta of COLOR_TOKENS_META) {
       if (meta.group) {
         const g = document.createElement("div");
         g.className = "prefs-group";
-        g.textContent = meta.group;
+        g.textContent = t(meta.group);
         container.append(g);
         continue;
       }
       const row = document.createElement("div");
       row.className = "prefs-row";
       const label = document.createElement("span");
-      label.textContent = meta.label;
+      label.textContent = t(meta.label);
       row.append(label);
 
       const colorWrap = document.createElement("div");
@@ -1414,37 +1681,73 @@ function buildTokenForms() {
 
 }
 
-// Conectar pestañas del panel de preferencias
+// Menú lateral de categorías: una sección visible a la vez.
+function showPrefsTab(name) {
+  for (const btn of document.querySelectorAll(".prefs-tab-btn")) {
+    btn.classList.toggle("active", btn.dataset.tab === name);
+  }
+  for (const panel of document.querySelectorAll("[data-tab-panel]")) {
+    panel.hidden = panel.dataset.tabPanel !== name;
+  }
+}
 document.querySelectorAll(".prefs-tab-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".prefs-tab-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    const target = btn.dataset.tab;
-    const tabGen = document.getElementById("prefTabGeneral");
-    const tabLight = document.getElementById("prefTabLight");
-    const tabDark = document.getElementById("prefTabDark");
-    if (tabGen) tabGen.hidden = target !== "general";
-    if (tabLight) tabLight.hidden = target !== "light";
-    if (tabDark) tabDark.hidden = target !== "dark";
-  });
+  btn.addEventListener("click", () => showPrefsTab(btn.dataset.tab));
 });
 
-function openPrefs() {
+// Lista de wikis: el select nombra lo guardado y marca la activa.
+function fillWikiServers() {
+  if (!wikiServerSel) return;
+  const current = wikiApi();
+  wikiServerSel.replaceChildren(...wikiServers().map((server) => {
+    const option = document.createElement("option");
+    option.value = server.api;
+    option.textContent = t("prefs.wiki.server.option", { name: server.name, api: server.api });
+    option.selected = server.api === current;
+    return option;
+  }));
+  if (!wikiServers().some((server) => server.api === current)) {
+    const option = document.createElement("option");
+    option.value = current;
+    option.textContent = t("prefs.wiki.server.option", { name: wikiServerLabel(current), api: current });
+    option.selected = true;
+    wikiServerSel.prepend(option);
+  }
+}
+
+const rerenderWikitext = () => {
+  for (const d of docs.filter((candidate) => candidate.format === "wikitext")) renderDoc(d, true);
+};
+
+function setWikiApi(api) {
+  try { localStorage.setItem(WIKI_API_KEY, api); } catch {}
+  fillWikiServers();
+  if (active) updateWikiStatus(active);
+  rerenderWikitext();
+}
+
+function openPrefs(tab) {
   if (mermaidSel) mermaidSel.value = mermaidTheme();
-  if (wikiApiInput) wikiApiInput.value = wikiApi();
+  fillWikiServers();
   if (wikiTitleInput) {
     try { wikiTitleInput.value = localStorage.getItem("luca.wikiTitle") || ""; } catch {}
   }
+  if (wikiStylesInput) wikiStylesInput.checked = wikiStylesOn();
+  if (wikiStyleModulesInput) {
+    try { wikiStyleModulesInput.value = localStorage.getItem(WIKI_STYLE_MODULES_KEY) || ""; } catch {}
+  }
   buildTokenForms();
+  renderDesignList();
+  if (typeof tab === "string") showPrefsTab(tab);
   utilityDialogTrigger = document.activeElement;
   if (prefsEl) {
     prefsEl.hidden = false;
-    document.getElementById("prefsClose")?.focus();
+    document.getElementById("prefsBack")?.focus();
   }
 }
 
 function closePrefs() {
   closeUtilityDialog(prefsEl);
+  active?.ed.remeasure?.();
 }
 
 async function openAbout() {
@@ -1452,7 +1755,7 @@ async function openAbout() {
   utilityDialogTrigger = document.activeElement;
   try {
     const version = await TAURI?.app?.getVersion?.();
-    if (version) document.getElementById("aboutVersion").textContent = `versión ${version}`;
+    if (version) document.getElementById("aboutVersion").textContent = t("about.version", { version });
   } catch {}
   aboutEl.hidden = false;
   document.getElementById("aboutClose")?.focus();
@@ -1471,6 +1774,66 @@ aboutEl?.querySelectorAll("[data-external]").forEach((link) => {
   });
 });
 
+// La lista es la que dice cuál se está editando: la fila activa se marca y un
+// clic cambia de diseño sin tocar el esquema claro/oscuro del dispositivo.
+function renderDesignList() {
+  if (!designListEl) return;
+  designListEl.replaceChildren(...designs.list.map((design) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.role = "option";
+    row.textContent = design.name;
+    row.ariaSelected = design.name === designs.active ? "true" : "false";
+    row.addEventListener("click", () => selectDesign(design.name));
+    return row;
+  }));
+  if (designNameInput) designNameInput.value = designs.active;
+}
+
+function useActiveDesign() {
+  tokensState = { ...pickTokens(activeDesign()), scheme: tokensState.scheme };
+  saveTokens();
+  applyTokens();
+  buildTokenForms();
+  renderDesignList();
+}
+
+function selectDesign(name) {
+  if (name === designs.active) return;
+  designs.active = name;
+  useActiveDesign();
+}
+
+// Nuevo parte de los valores de fábrica; duplicar copia el diseño actual. En
+// los dos casos el diseño nuevo queda activo, que es lo que se espera al crearlo.
+function addDesign(tokens, name) {
+  const unique = uniqueDesignName(designs.list.map((design) => design.name), name);
+  designs.list.push({ name: unique, ...pickTokens(tokens) });
+  designs.active = unique;
+  useActiveDesign();
+}
+
+async function removeDesign() {
+  if (designs.list.length < 2) {
+    alert(t("dialog.design.last"));
+    return;
+  }
+  const current = activeDesign();
+  if (!(await confirm(t("dialog.design.remove", { name: current.name })))) return;
+  designs.list = designs.list.filter((design) => design !== current);
+  designs.active = designs.list[0].name;
+  useActiveDesign();
+}
+
+function renameDesign(wanted) {
+  const current = activeDesign();
+  const unique = uniqueDesignName(designs.list.map((design) => design.name), wanted, { exclude: current.name });
+  current.name = unique;
+  designs.active = unique;
+  saveDesigns();
+  renderDesignList();
+}
+
 function resetTokens() {
   tokensState = {
     general: { ...VERA_DEFAULTS.general },
@@ -1483,34 +1846,40 @@ function resetTokens() {
   buildTokenForms();
 }
 
-// Exportar/importar todos los tokens (código, lectura, interfaz, claro y oscuro) como JSON.
-// El esquema claro/oscuro es una preferencia del dispositivo y no viaja con el archivo.
-const TOKENS_FILTER = [{ name: "Tokens de Luca", extensions: ["json"] }];
-const DIAGNOSTIC_FILTER = [{ name: "Diagnóstico de Luca", extensions: ["json"] }];
+// Exportar/importar un diseño como JSON: tipografías, medidas y los colores de
+// ambos temas, con su nombre. El esquema claro/oscuro es una preferencia del
+// dispositivo y no viaja con el archivo.
+const TOKENS_FILTER = () => [{ name: t("dialog.filter.design"), extensions: ["json"] }];
+const DIAGNOSTIC_FILTER = () => [{ name: t("dialog.filter.diagnostic"), extensions: ["json"] }];
 
 async function exportTokens() {
-  const path = await TAURI.dialog.save({ defaultPath: "luca-tokens.json", filters: TOKENS_FILTER });
+  const design = activeDesign();
+  const slug = design.name.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").toLowerCase();
+  const path = await TAURI.dialog.save({
+    defaultPath: `luca-diseno-${slug || "sin-nombre"}.json`,
+    filters: TOKENS_FILTER(),
+  });
   if (!path) return;
-  const { general, light, dark } = tokensState;
-  await TAURI.core.invoke("write_file", { path, contents: JSON.stringify({ general, light, dark }, null, 2) + "\n" });
+  const contents = JSON.stringify({ name: design.name, ...pickTokens(tokensState) }, null, 2);
+  await TAURI.core.invoke("write_file", { path, contents: `${contents}\n` });
 }
 
 async function importTokens() {
-  const path = await TAURI.dialog.open({ filters: TOKENS_FILTER });
+  const path = await TAURI.dialog.open({ filters: TOKENS_FILTER() });
   if (typeof path !== "string") return;
   const text = await TAURI.core.invoke("read_file", { path });
   let parsed;
   try { parsed = JSON.parse(text); } catch { parsed = null; }
-  if (!parsed || typeof parsed !== "object") { alert("El archivo no contiene tokens de Luca válidos."); return; }
-  // loadTokens completa con los valores de Vera y entiende el formato plano antiguo.
-  tokensState = { ...loadTokens(text), scheme: tokensState.scheme };
-  saveTokens();
-  applyTokens();
-  buildTokenForms();
+  if (!parsed || typeof parsed !== "object") { alert(t("dialog.design.invalid")); return; }
+  // Importar añade un diseño a la lista: nunca pisa el que se está usando.
+  // normalizeTokens completa con los valores de fábrica y descarta lo que no
+  // sea un token conocido, venga el archivo con la forma nueva o la plana.
+  const fallback = baseName(path).replace(/\.json$/i, "");
+  addDesign(normalizeTokens(parsed), typeof parsed.name === "string" ? parsed.name : fallback);
 }
 
 async function exportDiagnostic() {
-  const path = await TAURI.dialog.save({ defaultPath: "luca-diagnostico.json", filters: DIAGNOSTIC_FILTER });
+  const path = await TAURI.dialog.save({ defaultPath: "luca-diagnostico.json", filters: DIAGNOSTIC_FILTER() });
   if (!path) return;
   let version = "desconocida";
   try { version = await TAURI?.app?.getVersion?.() || version; } catch {}
@@ -1525,50 +1894,79 @@ async function exportDiagnostic() {
 }
 
 if (prefsEl) {
-  // Arrastre del panel desde su título; queda donde se suelte (dentro de la ventana).
-  prefsEl.querySelector(".prefs-panel h2")?.addEventListener("pointerdown", (e) => {
-    const r = prefsEl.getBoundingClientRect();
-    const dx = e.clientX - r.left, dy = e.clientY - r.top;
-    const move = (ev) => {
-      prefsEl.style.right = "auto";
-      prefsEl.style.left = `${Math.max(0, Math.min(innerWidth - r.width, ev.clientX - dx))}px`;
-      prefsEl.style.top = `${Math.max(0, Math.min(innerHeight - 40, ev.clientY - dy))}px`;
-    };
-    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
-    addEventListener("pointermove", move);
-    addEventListener("pointerup", up);
-    e.preventDefault();
-  });
-  document.getElementById("prefsClose")?.addEventListener("click", closePrefs);
+  document.getElementById("prefsBack")?.addEventListener("click", closePrefs);
   document.getElementById("prefsReset")?.addEventListener("click", resetTokens);
   document.getElementById("prefsExport")?.addEventListener("click", exportTokens);
   document.getElementById("prefsImport")?.addEventListener("click", importTokens);
   document.getElementById("prefsDiagnostic")?.addEventListener("click", exportDiagnostic);
+  document.getElementById("designAdd")?.addEventListener("click", () => addDesign(VERA_DEFAULTS, t("prefs.design.new_name")));
+  document.getElementById("designDuplicate")?.addEventListener("click", () => addDesign(tokensState, t("prefs.design.copy_suffix", { name: designs.active })));
+  document.getElementById("designRemove")?.addEventListener("click", removeDesign);
+  designNameInput?.addEventListener("change", () => renameDesign(designNameInput.value));
   mermaidSel?.addEventListener("change", () => {
     try { localStorage.setItem("luca.mermaidTheme", mermaidSel.value); } catch {}
     initMermaid();
     for (const d of docs) renderDoc(d);
   });
-  wikiApiInput?.addEventListener("change", () => {
-    const value = wikiApiInput.value.trim();
-    try {
-      const url = new URL(value);
-      if (url.protocol !== "https:") throw new Error();
-      localStorage.setItem("luca.wikiApi", url.href);
-      for (const d of docs.filter((candidate) => candidate.format === "wikitext")) renderDoc(d);
-    } catch {
-      alert("La API de MediaWiki debe ser una URL HTTPS válida.");
-      wikiApiInput.value = wikiApi();
-    }
+  languageSel?.addEventListener("change", () => {
+    try { localStorage.setItem(LANG_KEY, languageSel.value); } catch {}
+    setLanguage(resolveLanguage(languageSel.value));
+    applyLanguage();
+    // Los documentos Markdown no llevan rótulos, pero la vista previa Wikitext
+    // muestra su estado traducido: se repinta con el idioma nuevo.
+    if (active) updateWikiStatus(active);
   });
+  wikiServerSel?.addEventListener("change", () => setWikiApi(wikiServerSel.value));
+  wikiServerApiInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") addWikiServer(); });
+  document.getElementById("wikiServerAdd")?.addEventListener("click", addWikiServer);
+  document.getElementById("wikiServerRemove")?.addEventListener("click", removeWikiServer);
   wikiTitleInput?.addEventListener("change", () => {
     try {
       const value = wikiTitleInput.value.trim();
       if (value) localStorage.setItem("luca.wikiTitle", value);
       else localStorage.removeItem("luca.wikiTitle");
     } catch {}
-    for (const d of docs.filter((candidate) => candidate.format === "wikitext")) renderDoc(d);
+    rerenderWikitext();
   });
+  wikiStylesInput?.addEventListener("change", () => {
+    try { localStorage.setItem(WIKI_STYLES_KEY, wikiStylesInput.checked ? "on" : "off"); } catch {}
+    rerenderWikitext();
+  });
+  wikiStyleModulesInput?.addEventListener("change", () => {
+    try { localStorage.setItem(WIKI_STYLE_MODULES_KEY, wikiStyleModulesInput.value.trim()); } catch {}
+    wikiStyleSheets.clear();
+    rerenderWikitext();
+  });
+}
+
+// Guardar una wiki: nombre libre y endpoint api.php por HTTPS. Pasa a ser la
+// activa; si ya estaba, se actualiza su nombre.
+function addWikiServer() {
+  const api = (wikiServerApiInput?.value || "").trim();
+  let url;
+  try { url = new URL(api); } catch { url = null; }
+  if (!url || url.protocol !== "https:") {
+    alert(t("dialog.wiki.invalid"));
+    return;
+  }
+  const name = (wikiServerNameInput?.value || "").trim() || url.host;
+  const list = wikiServers().filter((server) => server.api !== url.href);
+  list.push({ name, api: url.href });
+  saveWikiServers(list);
+  if (wikiServerNameInput) wikiServerNameInput.value = "";
+  if (wikiServerApiInput) wikiServerApiInput.value = "";
+  setWikiApi(url.href);
+}
+
+function removeWikiServer() {
+  const current = wikiApi();
+  const list = wikiServers().filter((server) => server.api !== current);
+  if (!list.length) {
+    alert(t("dialog.wiki.last"));
+    return;
+  }
+  saveWikiServers(list);
+  setWikiApi(list[0].api);
 }
 
 // ⌘, abre Preferencias (macOS y web)
@@ -1579,8 +1977,32 @@ addEventListener("keydown", (e) => {
   }
 });
 
+// El idioma se aplica a lo que ya está en el DOM y al menú nativo, que Rust
+// arma con estas etiquetas. Lo que se dibuja después (pestañas, esquema,
+// formularios, paleta) ya se construye traducido.
+function applyLanguage() {
+  document.documentElement.lang = language();
+  translatePage(document, { key: shortcutPrefix });
+  // Rehacer el menú lo deja con su submenú de recientes vacío: se repuebla.
+  TAURI?.core.invoke("set_menu_labels", { labels: menuLabels() })
+    .then(renderRecentFiles)
+    .catch(() => {});
+  if (languageSel) languageSel.value = storedLanguage();
+  renderTabs();
+  if (active) {
+    updateFormatControls(active);
+    updateCursorStatus(active);
+    for (const d of docs) {
+      d.editorEl.setAttribute("aria-label", t("ui.editor_of", { name: baseName(d.path) }));
+      d.previewEl.setAttribute("aria-label", t("ui.preview_of", { name: baseName(d.path) }));
+    }
+  }
+  buildTokenForms();
+  renderDesignList();
+}
+
 applyTokens();
-buildTokenForms();
+applyLanguage();
 
 // Esc cierra preferencias si están abiertas, o sale del zen si está activo
 addEventListener("keydown", (e) => {

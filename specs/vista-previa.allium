@@ -10,6 +10,22 @@ use "./luca.allium" as luca
 use "./documento.allium" as documento
 
 ------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+-- Los límites de la vista previa, en un solo lugar. Los dos primeros acotan a
+-- Mermaid; los demás acotan lo que se le pide a una wiki ajena.
+config {
+    mermaid_max_edges: Integer = 2000
+    mermaid_max_text_size: Integer = 10000000
+    wiki_timeout_seconds: Integer = 15
+    wiki_max_response_bytes: Integer = 5242880
+    wiki_max_redirects: Integer = 3
+    reparse_markdown_ms: Integer = 150
+    reparse_wikitext_ms: Integer = 650
+}
+
+------------------------------------------------------------
 -- Editor: barra de pestañas y operaciones sobre documentos
 ------------------------------------------------------------
 
@@ -48,8 +64,8 @@ surface Editor {
     @guarantee ReordenarConservaElDocumento
         -- Arrastrar una pestaña o moverla con el teclado cambia sólo su lugar
         -- en la barra. No recrea el editor ni pierde borradores, historial,
-        -- cursor, selección o desplazamiento. El orden elegido permanece
-        -- mientras la ventana siga abierta.
+        -- cursor, selección o desplazamiento. El orden elegido se recuerda con
+        -- la sesión y se restaura al volver a abrir (RestauracionDeSesion).
 
     @guarantee IdentidadDeLaObra
         -- Los menús, el diálogo Acerca de Luca y los instaladores presentan a
@@ -80,12 +96,34 @@ surface Editor {
         -- La ayuda enumera acciones y atajos. La paleta busca comandos por
         -- nombre o atajo y ejecuta las mismas acciones que menús e interfaz.
 
+    @guarantee IdiomaDeLaInterfaz
+        -- La interfaz y el menú nativo se leen en español o en inglés. Sin una
+        -- elección explícita se toma el del sistema; un sistema en un idioma
+        -- que luca no tiene lee en inglés, que llega más lejos que mostrar
+        -- español a quien no lo habla. El idioma es del dispositivo: no viaja
+        -- en el documento, no toca su contenido y no cambia el de la wiki.
+        -- Elegirlo surte efecto al instante, sin reiniciar.
+
+    @guidance
+        -- El español es la fuente del catálogo: se escribe primero y es el
+        -- respaldo cuando a otro idioma le falta una clave. Un idioma nuevo es
+        -- un juego de claves más, no código nuevo; el menú nativo no tiene
+        -- catálogo propio, recibe sus etiquetas ya traducidas.
+
+    @guarantee ModosDeVista
+        -- El documento activo se lee en uno de tres modos —código, dividido y
+        -- renderizado— más un modo zen que oculta las barras. El modo y el zen
+        -- son del visor, no del documento: se recuerdan por ventana y no viajan
+        -- en el archivo. En el modo dividido la proporción entre los paneles se
+        -- ajusta arrastrando su divisor y también se recuerda.
+
     @guarantee NavegacionYEstado
         -- El esquema es un panel lateral opcional (botón de la barra, menú
         -- Vista o paleta) que permite saltar a encabezados Markdown o Wikitext;
-        -- los archivos recientes viven en el menú nativo Archivo. La
-        -- barra de estado muestra línea, columna, UTF-8, fin de línea y formato
-        -- del documento activo.
+        -- su ancho se ajusta arrastrando su divisor y se recuerda. Los
+        -- archivos recientes viven en el menú nativo Archivo. La barra de
+        -- estado muestra línea, columna, UTF-8, fin de línea y formato del
+        -- documento activo, y en Wikitext también el estado de su vista previa.
 }
 
 ------------------------------------------------------------
@@ -108,10 +146,24 @@ surface VistaPrevia {
         -- La medida (ancho de columna) rige todo el contenido renderizado:
         -- encabezados, tablas, diagramas Mermaid, código e imágenes.
 
+    @guarantee ImpresionLegible
+        -- Exportar a PDF imprime el documento renderizado con la paleta clara,
+        -- sea cual sea el tema de la pantalla: los colores de un diagrama
+        -- Mermaid se fijan al renderizarlo y en oscuro no se leerían sobre el
+        -- papel. Al cerrar el diálogo la pantalla recupera su tema.
+
     @guarantee SigueAlCursor
         -- En la vista dividida, la vista previa se desplaza al bloque donde
         -- está el cursor del editor; la proporción entre ambos paneles se
         -- ajusta arrastrando el divisor.
+
+    @guarantee MediosLocalesEnLaVistaPrevia
+        -- Una imagen, un audio o un vídeo referidos con ruta relativa se
+        -- resuelven respecto a la carpeta del archivo abierto y se muestran en
+        -- la vista previa. Sólo se autorizan archivos existentes con extensión
+        -- multimedia conocida; un recurso que no se puede mostrar lo dice en su
+        -- lugar y no rompe el resto del render. La referencia del documento
+        -- queda literal: resolverla es cosa de la proyección, no del texto.
 
     @guarantee RenderOffline
         -- marked y mermaid (con los motores ELK, tidy-tree y ZenUML) se cargan
@@ -146,17 +198,35 @@ surface VistaPreviaWikitext {
         -- La interfaz identifica la wiki configurada y distingue inequívocamente
         -- entre actualizando, respuesta actual, respuesta en caché, sin conexión
         -- y error. Una respuesta cacheada nunca se presenta como actual.
+        -- La wiki activa se elige entre las guardadas en preferencias, que el
+        -- autor puede añadir o quitar; siempre queda al menos una.
 
     @guarantee FuenteDisponibleSinConexion
         -- Un fallo de red o de la wiki no impide editar ni guardar Wikitext.
 
     @guarantee HTMLNoConfiable
         -- El HTML devuelto se sanea antes de insertarlo. No puede ejecutar
-        -- scripts, formularios, manejadores, estilos ni interfaz privilegiada.
+        -- scripts, formularios, manejadores ni interfaz privilegiada.
+
+    @guarantee EstilosDeLaWikiAislados
+        -- Previsualizar con las CSS de la wiki es opcional y apagado por
+        -- defecto. Al activarlo, la hoja de la wiki y los estilos que viajan
+        -- en su HTML gobiernan sólo el contenido, aislados del resto de luca:
+        -- no alcanzan la interfaz ni los tokens de diseño. Apagado, el HTML se
+        -- sanea sin estilos y la vista previa se lee con la medida de luca.
+        -- Las reglas que la wiki cuelga del documento se reanclan al contenido
+        -- aislado, de modo que sus variables de diseño sigan valiendo. La
+        -- tipografía no se descarga de la wiki: la familia que pida se resuelve
+        -- contra las que luca empaqueta y, si no tiene esa, contra las del
+        -- sistema que la propia wiki nombre a continuación.
 
     @guarantee SolicitudesAcotadas
-        -- Los cambios se agrupan, las solicitudes obsoletas se ignoran y cada
-        -- respuesta tiene límites de tiempo y tamaño.
+        -- Los cambios se agrupan antes de pedir el parseo (reparse_wikitext_ms,
+        -- más holgado que reparse_markdown_ms porque cada pedido sale a la red),
+        -- las solicitudes obsoletas se descartan al llegar, y cada respuesta
+        -- está acotada por wiki_timeout_seconds, wiki_max_response_bytes y
+        -- wiki_max_redirects. Toda petición a una wiki sale por un solo camino,
+        -- que impone esos límites y exige HTTPS sin credenciales en la URL.
 
     @guarantee SinSesionImplicita
         -- La preview no envía cookies ni reutiliza autenticación del navegador.

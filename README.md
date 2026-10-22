@@ -56,10 +56,14 @@ xattr -cr /Applications/Luca.app
   también en el menú Edición.
 - Formato por documento con detección por extensión y resaltado Wikitext.
 - Exportar a PDF.
-- Exportar e importar los tokens de diseño como JSON desde Preferencias.
-- Tipografía y colores configurables (`⌘,`), claro y oscuro.
+- Interfaz en español e inglés, según el sistema o a elección (`⌘,`).
+- Diseños con nombre: tipografías, medidas y colores de los temas claro y
+  oscuro, guardados como un juego que se duplica, se elimina y se exporta o
+  importa como JSON desde Preferencias (`⌘,`).
+- Vista previa Wikitext contra cualquier MediaWiki con `api.php` público, y
+  opción de previsualizar con las CSS de esa wiki.
 
-![Luca](./assets/luca-screenshot.png)
+![Luca](./assets/luca-01.png)
 
 ## Línea de comandos
 

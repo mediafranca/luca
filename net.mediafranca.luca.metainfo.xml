@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.mediafranca.luca</id>
+  
+  <name>Luca</name>
+  <summary>Simple text editor for markdown and wikitext with mermaid support</summary>
+  
+  <metadata_license>CC-BY-4.0</metadata_license>
+  <project_license>EUPL-1.2</project_license>
+  
+  <recommends>
+    <display_length compare="ge">640</display_length>
+  </recommends>
+  
+  <description>
+    <p>
+      Luca is a focused, open-source desktop editor for Markdown and Wikitext. It is designed for people who want a calm writing environment without giving up ownership of their work: documents remain ordinary local text files that can be opened, moved, versioned, and edited with other tools.
+    </p>
+    <p>
+      Luca combines source editing with clear, immediate previews. Markdown documents can include tables, task lists, links, images, and Mermaid diagrams. Wikitext documents can be edited with syntax highlighting and previewed through a configurable MediaWiki server, making Luca useful both for independent writing and for contributing to wiki-based knowledge projects. Network access is optional and limited to features that explicitly require it, such as MediaWiki preview.
+    </p>
+    <p>
+      The application supports multiple documents in tabs, recent files, session recovery, search and replace, multiple selections, a document outline, a command palette, and keyboard-oriented navigation. Files opened from the desktop or command line are delivered to the existing Luca window instead of creating unnecessary duplicate instances. A command-line interface also allows Luca to participate in external editing workflows.
+    </p>
+    <p>
+      Luca includes light and dark themes and a portable design-token system, so its appearance can be adapted, exported, backed up, and restored without changing document contents. Links open in the system browser rather than turning the editor into a browser, and local files remain the centre of the application: integrations with Vera and MediaWiki are optional services, not owners of the document.
+    </p>
+  </description>
+  
+  <launchable type="desktop-id">net.mediafranca.luca.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://github.com/mediafranca/luca/blob/56bee1eee3a17c6c63246ac5f3c0f5d8accf7d7b/assets/luca-screenshot.png</image>
+    </screenshot>
+  </screenshots>
+  
+  <icon type="stock">luca</icon>
+  
+  <categories>
+    <category>Office</category>
+    <category>WordProcessor</category>
+  </categories>
+  
+  <provides>
+    <binary>luca</binary>
+  </provides>
+</component>

@@ -11,10 +11,12 @@ surface InterfazAccesible {
         -- recorrer y activar sin un dispositivo apuntador.
 
     @guarantee FocoPerceptible
-        -- Todo control enfocado presenta un indicador visible; cerrar una
-        -- superficie modal devuelve el foco al control que la abrió.
+        -- Todo control enfocado presenta un indicador visible. Al cerrar una
+        -- superficie que se abrió sobre la app —diálogo, paleta o la página de
+        -- preferencias— el foco vuelve al control que la abrió, y Esc la cierra.
 
     @guarantee SemanticaDeAsistencia
-        -- Pestañas, regiones, diálogos y controles exponen roles y nombres
-        -- que permiten comprender su propósito con tecnología de asistencia.
+        -- Pestañas, regiones, diálogos, listas de selección y controles exponen
+        -- roles y nombres que permiten comprender su propósito con tecnología
+        -- de asistencia, y señalan cuál de sus elementos está seleccionado.
 }

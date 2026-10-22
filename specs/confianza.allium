@@ -26,10 +26,36 @@ rule ExportarDiagnostico {
         -- recientes, URL de la wiki, cookies, credenciales ni tokens de diseño.
 }
 
+rule EditarDiseno {
+    when: AutorEditaDiseno(autor)
+
+    @guarantee DisenoActivoExplicito
+        -- Los valores gráficos —tipografías, medidas y los colores de los temas
+        -- claro y oscuro— se guardan en diseños con nombre. La interfaz señala
+        -- cuál está activo y toda edición gráfica recae en ése.
+
+    @guarantee ImportarAnade
+        -- Importar un diseño lo añade a la lista con su nombre y lo deja activo;
+        -- no sobrescribe el que está en uso. Un nombre repetido se numera.
+
+    @guarantee SoloTokensConocidos
+        -- De un archivo importado se aceptan únicamente nombres de token
+        -- conocidos, y valores que no puedan cerrar la declaración e introducir
+        -- reglas propias.
+
+    @guarantee SiempreQuedaUnDiseno
+        -- Eliminar un diseño pide confirmación y nunca deja la lista vacía.
+
+    @guidance
+        -- El esquema claro u oscuro es una preferencia del dispositivo: no
+        -- pertenece al diseño ni viaja en el archivo exportado.
+}
+
 surface Confianza {
     facing autor: luca/Autor
 
     provides:
         AutorIniciaLuca(autor)
         AutorExportaDiagnostico(autor)
+        AutorEditaDiseno(autor)
 }

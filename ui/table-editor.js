@@ -3,6 +3,10 @@
 // alineación, cabeceras en fila o columna, pegado desde hojas de cálculo y atajos de teclado.
 
 import { icon } from "./icons.js";
+import { t } from "./i18n.js";
+
+// El modificador de los atajos de celda, igual que en la paleta.
+const CELL_MOD = navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+";
 import {
   cloneTable,
   tableHeaderAxis,
@@ -134,10 +138,10 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
       );
     };
     format.append(
-      button("bold", "Negrita en celda (⌘B)", () => formatWith("bold")),
-      button("italic", "Cursiva en celda (⌘I)", () => formatWith("italic")),
-      button("code", "Código en celda", () => formatWith("code")),
-      button("link", "Enlace en celda (⌘K)", () => {
+      button("bold", t("table.cell_bold", { key: CELL_MOD }), () => formatWith("bold")),
+      button("italic", t("table.cell_italic", { key: CELL_MOD }), () => formatWith("italic")),
+      button("code", t("table.cell_code"), () => formatWith("code")),
+      button("link", t("table.cell_link", { key: CELL_MOD }), () => {
         if (!activeInput) return;
         applyOutcome(resolveCellLink(format, activeInput.value, activeInput.selectionStart ?? 0, activeInput.selectionEnd ?? activeInput.value.length));
       })
@@ -147,19 +151,19 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
     const structure = document.createElement("div");
     structure.className = "table-editor-tool-group";
     structure.append(
-      button("circle-plus", "Añadir fila abajo", () => {
+      button("circle-plus", t("table.row_add"), () => {
         const newRow = Array.from({ length: table.header.length }, () => "");
         table.rows.splice(active.row === 0 ? 0 : active.row, 0, newRow);
         dirty = true;
         render({ row: active.row + 1, column: active.column });
       }, { action: "add-row" }),
-      button("circle-minus", "Eliminar fila actual", () => {
+      button("circle-minus", t("table.row_remove"), () => {
         if (active.row === 0 || table.rows.length === 0) return;
         table.rows.splice(active.row - 1, 1);
         dirty = true;
         render({ row: Math.max(0, active.row - 1), column: active.column });
       }, { action: "remove-row" }),
-      button("columns-3", "Añadir columna a la derecha", () => {
+      button("columns-3", t("table.col_add"), () => {
         const insertAt = active.column + 1;
         table.header.splice(insertAt, 0, `Columna ${table.header.length + 1}`);
         table.alignments.splice(insertAt, 0, "left");
@@ -167,7 +171,7 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
         dirty = true;
         render({ row: active.row, column: insertAt });
       }, { action: "add-column" }),
-      button("circle-minus", "Eliminar columna actual", () => {
+      button("circle-minus", t("table.col_remove"), () => {
         if (table.header.length <= 1) return;
         table.header.splice(active.column, 1);
         table.alignments.splice(active.column, 1);
@@ -181,13 +185,13 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
     const headers = document.createElement("div");
     headers.className = "table-editor-tool-group table-editor-headers";
     headers.append(
-      button("rows-3", "Primera fila como cabecera", () => {
+      button("rows-3", t("table.header_row"), () => {
         table = changeTableHeaderAxis(table, "row");
         headerAxis = "row";
         dirty = true;
         render({ row: 0, column: 0 });
       }, { action: "header-row" }),
-      button("columns-3", "Primera columna como cabecera", () => {
+      button("columns-3", t("table.header_col"), () => {
         table = changeTableHeaderAxis(table, "column");
         headerAxis = "column";
         dirty = true;
@@ -203,9 +207,9 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
     const alignment = document.createElement("div");
     alignment.className = "table-editor-tool-group table-editor-alignment";
     for (const [val, iconName, label] of [
-      ["left", "align-left", "Alinear a la izquierda"],
-      ["center", "align-center", "Centrar columna"],
-      ["right", "align-right", "Alinear a la derecha"],
+      ["left", "align-left", t("table.align_left")],
+      ["center", "align-center", t("table.align_center")],
+      ["right", "align-right", t("table.align_right")],
     ]) {
       alignment.append(
         button(iconName, label, () => {
@@ -341,7 +345,7 @@ export function mountMarkdownTableEditor(host, originalTable, options = {}) {
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "btn-secondary";
-    cancelBtn.textContent = "Cancelar";
+    cancelBtn.textContent = t("table.cancel");
     cancelBtn.addEventListener("click", () => options.onClose?.(null));
 
     const doneBtn = document.createElement("button");
@@ -384,7 +388,7 @@ export function openTableEditorModal({ table, onSave, onCancel, format = "markdo
           <div class="table-modal-title">
             ${icon("grid")} <span>Editor de tabla Markdown</span>
           </div>
-          <button type="button" class="table-modal-close" title="Cerrar (Esc)">${icon("x")}</button>
+          <button type="button" class="table-modal-close" title="${t("table.close")}">${icon("x")}</button>
         </div>
         <div class="table-modal-body"></div>
       </div>

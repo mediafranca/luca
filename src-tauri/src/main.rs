@@ -41,6 +41,10 @@ struct ParseEnvelope {
 #[derive(serde::Deserialize)]
 struct ParseResult {
     text: String,
+    #[serde(default)]
+    modulestyles: Vec<String>,
+    #[serde(default)]
+    modules: Vec<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -48,15 +52,22 @@ struct ApiError {
     info: String,
 }
 
-#[tauri::command]
-async fn parse_wikitext(api_url: String, title: String, text: String) -> Result<String, String> {
-    let url = reqwest::Url::parse(&api_url).map_err(|_| "URL de wiki inválida".to_string())?;
+#[derive(serde::Serialize)]
+struct ParsedWikitext {
+    html: String,
+    modules: Vec<String>,
+}
+
+// Toda llamada a una wiki pasa por aquí: HTTPS sin credenciales, tiempo
+// limitado, redirecciones acotadas y sin cookies (el cliente es efímero).
+fn wiki_client(api_url: &str) -> Result<(reqwest::Client, reqwest::Url), String> {
+    let url = reqwest::Url::parse(api_url).map_err(|_| "err.wiki.url".to_string())?;
     if url.scheme() != "https"
         || url.host_str().is_none()
         || !url.username().is_empty()
         || url.password().is_some()
     {
-        return Err("La API de la wiki debe usar HTTPS y no incluir credenciales".into());
+        return Err("err.wiki.not_https".into());
     }
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
@@ -67,45 +78,216 @@ async fn parse_wikitext(api_url: String, title: String, text: String) -> Result<
                 attempt.stop()
             }
         }))
-        .user_agent(concat!("Luca/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!(
+            "Luca/",
+            env!("CARGO_PKG_VERSION"),
+            " (https://github.com/mediafranca/luca)"
+        ))
         .build()
         .map_err(|e| e.to_string())?;
+    Ok((client, url))
+}
+
+async fn wiki_body(response: reqwest::Response) -> Result<Vec<u8>, String> {
+    if !response.status().is_success() {
+        return Err(format!("err.wiki.http|{}", response.status()));
+    }
+    if response
+        .content_length()
+        .is_some_and(|n| n > MAX_WIKI_RESPONSE)
+    {
+        return Err("err.wiki.too_large".into());
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > MAX_WIKI_RESPONSE {
+        return Err("err.wiki.too_large".into());
+    }
+    Ok(bytes.to_vec())
+}
+
+#[tauri::command]
+async fn parse_wikitext(
+    api_url: String,
+    title: String,
+    text: String,
+) -> Result<ParsedWikitext, String> {
+    let (client, url) = wiki_client(&api_url)?;
     let response = client
         .post(url)
         .form(&[
             ("action", "parse"),
             ("format", "json"),
             ("formatversion", "2"),
-            ("prop", "text"),
+            ("prop", "text|modules"),
             ("disableeditsection", "1"),
             ("title", title.as_str()),
             ("text", text.as_str()),
         ])
         .send()
         .await
-        .map_err(|e| format!("No se pudo contactar la wiki: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!("La wiki respondió HTTP {}", response.status()));
-    }
-    if response
-        .content_length()
-        .is_some_and(|n| n > MAX_WIKI_RESPONSE)
-    {
-        return Err("La respuesta de la wiki excede 5 MiB".into());
-    }
-    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > MAX_WIKI_RESPONSE {
-        return Err("La respuesta de la wiki excede 5 MiB".into());
-    }
+        .map_err(|e| format!("err.wiki.unreachable|{e}"))?;
+    let bytes = wiki_body(response).await?;
     let envelope: ParseEnvelope = serde_json::from_slice(&bytes)
-        .map_err(|_| "Respuesta inválida de MediaWiki".to_string())?;
+        .map_err(|_| "err.wiki.invalid_json".to_string())?;
     if let Some(error) = envelope.error {
-        return Err(error.info);
+        return Err(format!("err.wiki.api|{}", error.info));
     }
     envelope
         .parse
-        .map(|parsed| parsed.text)
-        .ok_or_else(|| "MediaWiki no devolvió HTML".into())
+        .map(|parsed| {
+            // modulestyles son los módulos de sólo estilo; modules incluye los
+            // de extensión (ext.smw.styles y compañía). load.php con
+            // only=styles devuelve el CSS de ambos y omite lo que no exista.
+            let mut modules = parsed.modulestyles;
+            for name in parsed.modules {
+                if !modules.contains(&name) {
+                    modules.push(name);
+                }
+            }
+            ParsedWikitext {
+                html: parsed.text,
+                modules,
+            }
+        })
+        .ok_or_else(|| "err.wiki.no_html".into())
+}
+
+// Un nombre de módulo de ResourceLoader no lleva separadores de consulta: así
+// la lista no puede inyectar parámetros en load.php.
+fn valid_module_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 120
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
+#[derive(serde::Deserialize)]
+struct SkinsEnvelope {
+    query: Option<SkinsQuery>,
+}
+
+#[derive(serde::Deserialize)]
+struct SkinsQuery {
+    #[serde(default)]
+    skins: Vec<SkinInfo>,
+}
+
+#[derive(serde::Deserialize)]
+struct SkinInfo {
+    code: Option<String>,
+    #[serde(default)]
+    default: bool,
+}
+
+// `.wikitable`, la medida y la tipografía no están en site.styles: las trae el
+// módulo de estilos de la skin por defecto de la wiki (en Casiopea,
+// skins.stellanova.styles). Sin él la vista previa recibe el HTML de la wiki
+// desnudo, que es justamente lo que se veía.
+fn default_skin_module(body: &[u8]) -> Option<String> {
+    let envelope: SkinsEnvelope = serde_json::from_slice(body).ok()?;
+    let code = envelope
+        .query?
+        .skins
+        .into_iter()
+        .find(|skin| skin.default)
+        .and_then(|skin| skin.code)?;
+    let module = format!("skins.{code}.styles");
+    valid_module_name(&module).then_some(module)
+}
+
+async fn default_skin(client: &reqwest::Client, api: &reqwest::Url) -> Option<String> {
+    let mut url = api.clone();
+    url.set_query(None);
+    url.query_pairs_mut()
+        .append_pair("action", "query")
+        .append_pair("meta", "siteinfo")
+        .append_pair("siprop", "skins")
+        .append_pair("format", "json")
+        .append_pair("formatversion", "2");
+    let response = client.get(url).send().await.ok()?;
+    default_skin_module(&wiki_body(response).await.ok()?)
+}
+
+// load.php vive junto a api.php: devuelve las hojas de estilo de la wiki
+// (la skin, Common.css del sitio y los módulos que el parseo declaró).
+#[tauri::command]
+async fn fetch_wiki_styles(api_url: String, modules: Vec<String>) -> Result<String, String> {
+    let (client, api) = wiki_client(&api_url)?;
+    let mut names: Vec<String> = modules
+        .into_iter()
+        .filter(|name| valid_module_name(name))
+        .collect();
+    // La skin va primero: site.styles está escrito para pisarla, como en la wiki.
+    if let Some(skin) = default_skin(&client, &api).await {
+        if !names.contains(&skin) {
+            names.insert(0, skin);
+        }
+    }
+    if names.is_empty() {
+        return Err("err.styles.no_modules".into());
+    }
+    let mut url = api.clone();
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| "err.wiki.url".to_string())?;
+        segments.pop();
+        segments.push("load.php");
+    }
+    url.set_query(None);
+    url.query_pairs_mut()
+        .append_pair("modules", &names.join("|"))
+        .append_pair("only", "styles");
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("err.styles.unreachable|{e}"))?;
+    let is_css = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("text/css"));
+    if !is_css {
+        return Err("err.styles.not_css".into());
+    }
+    let bytes = wiki_body(response).await?;
+    String::from_utf8(bytes).map_err(|_| "err.styles.not_utf8".into())
+}
+
+#[cfg(test)]
+mod wiki_tests {
+    use super::{default_skin_module, valid_module_name};
+
+    #[test]
+    fn toma_la_skin_marcada_por_defecto() {
+        let body = br#"{"query":{"skins":[
+            {"code":"vector","default":false},
+            {"code":"stellanova","default":true},
+            {"code":"citizen"}]}}"#;
+        assert_eq!(
+            default_skin_module(body).as_deref(),
+            Some("skins.stellanova.styles")
+        );
+        // Sin skin por defecto, sin código o con basura, no se pide nada.
+        assert_eq!(default_skin_module(br#"{"query":{"skins":[]}}"#), None);
+        assert_eq!(default_skin_module(br#"{"batchcomplete":true}"#), None);
+        assert_eq!(default_skin_module(b"no-json"), None);
+        assert_eq!(
+            default_skin_module(br#"{"query":{"skins":[{"code":"a|b","default":true}]}}"#),
+            None
+        );
+    }
+
+    #[test]
+    fn solo_nombres_de_modulo_inofensivos() {
+        assert!(valid_module_name("site.styles"));
+        assert!(valid_module_name("ext.smw.style"));
+        assert!(!valid_module_name(""));
+        assert!(!valid_module_name("site.styles|only=scripts"));
+        assert!(!valid_module_name("a b"));
+    }
 }
 
 // Analiza tanto aperturas iniciales como argumentos reenviados por la segunda
@@ -149,7 +331,7 @@ fn transfer_tab(
     payload: serde_json::Value,
 ) -> Result<(), String> {
     if app.get_webview_window(&target).is_none() {
-        return Err("La ventana de destino ya no existe".into());
+        return Err("err.window.gone".into());
     }
     if let Some(path) = payload.get("path").and_then(|value| value.as_str()) {
         registry
@@ -222,7 +404,7 @@ fn focus_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
 #[tauri::command]
 fn gather_windows(app: tauri::AppHandle, target: String) -> Result<(), String> {
     if app.get_webview_window(&target).is_none() {
-        return Err("La ventana de destino ya no existe".into());
+        return Err("err.window.gone".into());
     }
     for label in app
         .webview_windows()
@@ -284,9 +466,9 @@ fn allow_preview_asset(app: tauri::AppHandle, path: String) -> Result<String, St
         .extension()
         .and_then(|value| value.to_str())
         .map(str::to_ascii_lowercase)
-        .ok_or_else(|| "El recurso local no tiene una extensión multimedia".to_string())?;
+        .ok_or_else(|| "err.asset.no_extension".to_string())?;
     if !MEDIA_EXTENSIONS.contains(&extension.as_str()) {
-        return Err("El recurso local no es un formato multimedia permitido".into());
+        return Err("err.asset.not_media".into());
     }
     app.asset_protocol_scope()
         .allow_file(&canonical)
@@ -335,13 +517,25 @@ fn print_with_margins(webview: tauri::Webview) -> Result<(), String> {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = webview;
-        Err("sin impresión nativa en esta plataforma".into())
+        Err("err.print.unsupported".into())
     }
 }
 
 // Submenú «Archivo ▸ Abrir reciente». El frontend guarda la lista de recientes
 // y la vuelca aquí con `set_recent_files`; los ítems emiten `recent:<índice>`.
 struct RecentMenu(Mutex<Option<Submenu<tauri::Wry>>>);
+
+// Las etiquetas del menú, tal como las envió el frontend. Se guardan para que
+// set_recent_files pueda rotular su submenú sin volver a pedirlas.
+type MenuLabelMap = std::collections::HashMap<String, String>;
+struct MenuLabels(Mutex<MenuLabelMap>);
+
+#[tauri::command]
+fn set_menu_labels(app: tauri::AppHandle, labels: MenuLabelMap) -> Result<(), String> {
+    *app.state::<MenuLabels>().0.lock().unwrap() = labels;
+    let stored = app.state::<MenuLabels>().0.lock().unwrap().clone();
+    build_menu(&app, &stored).map_err(|e| e.to_string())
+}
 
 fn recent_label(path: &str) -> String {
     let p = std::path::Path::new(path);
@@ -363,8 +557,20 @@ fn recent_label(path: &str) -> String {
 fn set_recent_files(
     app: tauri::AppHandle,
     menu: tauri::State<RecentMenu>,
+    labels: tauri::State<MenuLabels>,
     paths: Vec<String>,
 ) -> Result<(), String> {
+    let lbl = |key: &str, fallback: &str| -> String {
+        labels
+            .0
+            .lock()
+            .unwrap()
+            .get(key)
+            .map(String::as_str)
+            .filter(|value| !value.is_empty())
+            .unwrap_or(fallback)
+            .to_string()
+    };
     let guard = menu.0.lock().unwrap();
     let Some(submenu) = guard.as_ref() else {
         return Ok(());
@@ -374,7 +580,7 @@ fn set_recent_files(
         submenu.remove(&entry).map_err(err)?;
     }
     if paths.is_empty() {
-        let none = MenuItemBuilder::with_id("recent_none", "Sin recientes")
+        let none = MenuItemBuilder::with_id("recent_none", lbl("file.recent_none", "Sin recientes"))
             .enabled(false)
             .build(&app)
             .map_err(err)?;
@@ -389,7 +595,7 @@ fn set_recent_files(
     submenu
         .append(&PredefinedMenuItem::separator(&app).map_err(err)?)
         .map_err(err)?;
-    let clear = MenuItemBuilder::with_id("recent_clear", "Vaciar recientes")
+    let clear = MenuItemBuilder::with_id("recent_clear", lbl("file.recent_clear", "Vaciar recientes"))
         .build(&app)
         .map_err(err)?;
     submenu.append(&clear).map_err(err)
@@ -408,7 +614,19 @@ mod recent_tests {
 
 // Menú nativo. Los ítems propios emiten su id al frontend (evento "menu"); los
 // predefinidos (deshacer/copiar/pegar, salir…) los maneja el sistema.
-fn build_menu(app: &tauri::App) -> tauri::Result<()> {
+// El menú nativo no tiene catálogo propio: el frontend le envía las etiquetas
+// traducidas (ui/i18n.js es la única fuente de texto de la app). Los literales
+// españoles que quedan aquí son sólo el arranque, para los milisegundos
+// anteriores a que la ventana cargue y llame a set_menu_labels.
+fn build_menu(app: &tauri::AppHandle, labels: &MenuLabelMap) -> tauri::Result<()> {
+    let lbl = |key: &str, fallback: &'static str| -> String {
+        labels
+            .get(key)
+            .map(String::as_str)
+            .filter(|value| !value.is_empty())
+            .unwrap_or(fallback)
+            .to_string()
+    };
     let item = |id: &str, label: &str, accel: Option<&str>| {
         let mut b = MenuItemBuilder::with_id(id, label);
         if let Some(a) = accel {
@@ -419,10 +637,10 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
 
     let prefs_mermaid = item(
         "prefs_mermaid",
-        "Configuración de diseño…",
+        &lbl("app.prefs", "Preferencias…"),
         Some("CmdOrCtrl+,"),
     )?;
-    let about = item("about", "Acerca de Luca", None)?;
+    let about = item("about", &lbl("app.about", "Acerca de Luca"), None)?;
 
     let app_menu = SubmenuBuilder::new(app, "Luca")
         .item(&about)
@@ -438,41 +656,41 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .quit()
         .build()?;
 
-    let recientes = SubmenuBuilder::new(app, "Abrir reciente")
+    let recientes = SubmenuBuilder::new(app, lbl("file.recent", "Abrir reciente"))
         .item(
-            &MenuItemBuilder::with_id("recent_none", "Sin recientes")
+            &MenuItemBuilder::with_id("recent_none", lbl("file.recent_none", "Sin recientes"))
                 .enabled(false)
                 .build(app)?,
         )
         .build()?;
-    app.manage(RecentMenu(Mutex::new(Some(recientes.clone()))));
+    *app.state::<RecentMenu>().0.lock().unwrap() = Some(recientes.clone());
 
-    let archivo = SubmenuBuilder::new(app, "Archivo")
-        .item(&item("new", "Nuevo", Some("CmdOrCtrl+N"))?)
-        .item(&item("open", "Abrir…", Some("CmdOrCtrl+O"))?)
+    let archivo = SubmenuBuilder::new(app, lbl("file", "Archivo"))
+        .item(&item("new", &lbl("file.new", "Nuevo"), Some("CmdOrCtrl+N"))?)
+        .item(&item("open", &lbl("file.open", "Abrir…"), Some("CmdOrCtrl+O"))?)
         .item(&recientes)
         .separator()
-        .item(&item("save", "Guardar", Some("CmdOrCtrl+S"))?)
+        .item(&item("save", &lbl("file.save", "Guardar"), Some("CmdOrCtrl+S"))?)
         .item(&item(
             "save_as",
-            "Guardar como…",
+            &lbl("file.save_as", "Guardar como…"),
             Some("CmdOrCtrl+Shift+S"),
         )?)
         .separator()
-        .item(&item("export_pdf", "Exportar (PDF)…", Some("CmdOrCtrl+E"))?)
+        .item(&item("export_pdf", &lbl("file.export_pdf", "Exportar (PDF)…"), Some("CmdOrCtrl+E"))?)
         .separator()
         .item(&prefs_mermaid)
         .separator()
-        .item(&item("close_tab", "Cerrar pestaña", Some("CmdOrCtrl+W"))?)
+        .item(&item("close_tab", &lbl("file.close_tab", "Cerrar pestaña"), Some("CmdOrCtrl+W"))?)
         .build()?;
 
-    let edicion = SubmenuBuilder::new(app, "Edición")
+    let edicion = SubmenuBuilder::new(app, lbl("edit", "Edición"))
         .undo()
         .redo()
         .separator()
         .item(&item(
             "select_next_occurrence",
-            "Seleccionar siguiente aparición",
+            &lbl("edit.select_next", "Seleccionar siguiente aparición"),
             Some("CmdOrCtrl+D"),
         )?)
         .separator()
@@ -482,58 +700,58 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .select_all()
         .build()?;
 
-    let vista = SubmenuBuilder::new(app, "Vista")
+    let vista = SubmenuBuilder::new(app, lbl("view", "Vista"))
         .item(&item(
             "mode_source",
-            "Código Markdown",
+            &lbl("view.source", "Código fuente"),
             Some("CmdOrCtrl+1"),
         )?)
-        .item(&item("mode_split", "Vista dividida", Some("CmdOrCtrl+2"))?)
+        .item(&item("mode_split", &lbl("view.split", "Vista dividida"), Some("CmdOrCtrl+2"))?)
         .item(&item(
             "mode_rendered",
-            "Texto renderizado",
+            &lbl("view.rendered", "Texto renderizado"),
             Some("CmdOrCtrl+3"),
         )?)
         .separator()
-        .item(&item("outline", "Esquema de encabezados", None)?)
+        .item(&item("outline", &lbl("view.outline", "Esquema de encabezados"), None)?)
         .separator()
-        .item(&item("zen", "Modo zen", Some("CmdOrCtrl+Shift+Z"))?)
+        .item(&item("zen", &lbl("view.zen", "Modo zen"), Some("CmdOrCtrl+Shift+Z"))?)
         .build()?;
 
-    let ventana = SubmenuBuilder::new(app, "Ventana")
+    let ventana = SubmenuBuilder::new(app, lbl("window", "Ventana"))
         .item(&item(
             "new_window",
-            "Nueva ventana",
+            &lbl("window.new", "Nueva ventana"),
             Some("CmdOrCtrl+Shift+N"),
         )?)
         .item(&item(
             "detach_tab",
-            "Mover pestaña a nueva ventana",
+            &lbl("window.detach", "Mover pestaña a nueva ventana"),
             Some("CmdOrCtrl+Shift+M"),
         )?)
         .item(&item(
             "move_tab_left",
-            "Mover pestaña a la izquierda",
+            &lbl("window.tab_left", "Mover pestaña a la izquierda"),
             Some("Alt+Shift+Left"),
         )?)
         .item(&item(
             "move_tab_right",
-            "Mover pestaña a la derecha",
+            &lbl("window.tab_right", "Mover pestaña a la derecha"),
             Some("Alt+Shift+Right"),
         )?)
         .separator()
-        .item(&item("gather_windows", "Reunir todas las ventanas", None)?)
+        .item(&item("gather_windows", &lbl("window.gather", "Reunir todas las ventanas"), None)?)
         .separator()
         .minimize()
         .build()?;
 
-    let ayuda = SubmenuBuilder::new(app, "Ayuda")
+    let ayuda = SubmenuBuilder::new(app, lbl("help", "Ayuda"))
         .item(&item(
             "command_palette",
-            "Paleta de comandos…",
+            &lbl("help.palette", "Paleta de comandos…"),
             Some("CmdOrCtrl+Shift+P"),
         )?)
-        .item(&item("shortcuts", "Atajos de teclado", Some("F1"))?)
+        .item(&item("shortcuts", &lbl("help.shortcuts", "Atajos de teclado"), Some("F1"))?)
         .build()?;
 
     let menu = MenuBuilder::new(app)
@@ -599,9 +817,11 @@ fn main() {
             allow_preview_asset,
             take_opened_files,
             set_recent_files,
+            set_menu_labels,
             take_new_document,
             print_with_margins,
             parse_wikitext,
+            fetch_wiki_styles,
             create_editor_window,
             transfer_tab,
             take_transferred_tabs,
@@ -616,7 +836,9 @@ fn main() {
             app.state::<Pending>()
                 .new_document
                 .store(startup_request.new_document, Ordering::SeqCst);
-            build_menu(app)?;
+            app.manage(RecentMenu(Mutex::new(None)));
+            app.manage(MenuLabels(Mutex::new(MenuLabelMap::new())));
+            build_menu(app.handle(), &MenuLabelMap::new())?;
             Ok(())
         })
         .on_menu_event(|app, event| {

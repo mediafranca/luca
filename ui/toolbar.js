@@ -2,6 +2,7 @@
 // Proporciona formato tipográfico, encabezados, bloques de código, listas, enlaces y editor de tablas.
 
 import { icon } from "./icons.js";
+import { t } from "./i18n.js";
 import { readMarkdownTable, newMarkdownTable } from "./markdown-table.js";
 import { openTableEditorModal } from "./table-editor.js";
 import {
@@ -29,7 +30,7 @@ export function createEditorToolbar(doc, onTableEdit) {
   const bar = document.createElement("div");
   bar.className = "editor-toolbar";
   bar.setAttribute("role", "toolbar");
-  bar.setAttribute("aria-label", "Herramientas de edición de código");
+  bar.setAttribute("aria-label", t("toolbar.label"));
 
   const actionButton = (iconName, label, onClick, extraClass = "") => {
     const btn = document.createElement("button");
@@ -75,14 +76,14 @@ export function createEditorToolbar(doc, onTableEdit) {
     ed.focus();
   };
 
-  const h1Btn = textButton("H₁", "Encabezado nivel 1 (#)", () => applyHeading(1), "toolbar-h-main");
+  const h1Btn = textButton("H₁", t("toolbar.heading1"), () => applyHeading(1), "toolbar-h-main");
   h1Btn.dataset.heading = "1";
   const headingToggle = document.createElement("button");
   headingToggle.type = "button";
   headingToggle.className = "toolbar-action toolbar-heading-toggle";
   headingToggle.innerHTML = icon("chevron-down");
-  headingToggle.title = "Más niveles de encabezado";
-  headingToggle.setAttribute("aria-label", "Más niveles de encabezado");
+  headingToggle.title = t("toolbar.heading_more");
+  headingToggle.setAttribute("aria-label", t("toolbar.heading_more"));
 
   let activeHeadingMenu = null;
   const closeHeadingMenu = () => {
@@ -129,7 +130,7 @@ export function createEditorToolbar(doc, onTableEdit) {
       { label: "H₄", level: 4, title: `Nivel 4 (${mark(4)})` },
       { label: "H₅", level: 5, title: `Nivel 5 (${mark(5)})` },
       { label: "H₆", level: 6, title: `Nivel 6 (${mark(6)})` },
-      { label: "P", level: 0, title: "Párrafo normal (sin encabezado)" },
+      { label: "P", level: 0, title: t("toolbar.paragraph") },
     ];
 
     for (const item of levels) {
@@ -179,13 +180,13 @@ export function createEditorToolbar(doc, onTableEdit) {
   };
 
   formatGroup.append(
-    inlineButton("bold", "bold", "Negrita"),
-    inlineButton("italic", "italic", "Cursiva", "format-italic"),
-    inlineButton("strikethrough", "strikethrough", "Tachado", "format-strike"),
-    inlineButton("underline", "underline", "Subrayado", "format-underline"),
-    inlineButton("superscript", "superscript", "Superíndice"),
-    inlineButton("subscript", "subscript", "Subíndice"),
-    inlineButton("code", "code", "Código en línea")
+    inlineButton("bold", "bold", t("toolbar.bold")),
+    inlineButton("italic", "italic", t("toolbar.italic"), "format-italic"),
+    inlineButton("strikethrough", "strikethrough", t("toolbar.strike"), "format-strike"),
+    inlineButton("underline", "underline", t("toolbar.underline"), "format-underline"),
+    inlineButton("superscript", "superscript", t("toolbar.superscript")),
+    inlineButton("subscript", "subscript", t("toolbar.subscript")),
+    inlineButton("code", "code", t("toolbar.code_inline"))
   );
 
   // 3. Grupo de bloques y listas
@@ -216,13 +217,13 @@ export function createEditorToolbar(doc, onTableEdit) {
     return btn;
   };
 
-  const codeBlockBtn = actionButton("code-block", "Bloque de código", insertCodeBlock);
+  const codeBlockBtn = actionButton("code-block", t("toolbar.code_block"), insertCodeBlock);
   codeBlockBtn.dataset.block = "code";
   blockGroup.append(
-    lineButton("quote", "quote", "Cita"),
-    lineButton("bullet", "list", "Lista con viñetas"),
-    lineButton("numbered", "list-numbers", "Lista numerada"),
-    lineButton("task", "list-check", "Lista de tareas"),
+    lineButton("quote", "quote", t("toolbar.quote")),
+    lineButton("bullet", "list", t("toolbar.bullets")),
+    lineButton("numbered", "list-numbers", t("toolbar.numbered")),
+    lineButton("task", "list-check", t("toolbar.tasks")),
     codeBlockBtn
   );
 
@@ -331,12 +332,12 @@ export function createEditorToolbar(doc, onTableEdit) {
     });
   };
 
-  const linkBtn = actionButton("link", "Enlace externo", () => insertLink(false));
+  const linkBtn = actionButton("link", t("toolbar.link.external"), () => insertLink(false));
   linkBtn.dataset.link = "external";
-  const tableBtn = actionButton("grid", "Editor de tabla", handleTableButton, "toolbar-table-btn");
+  const tableBtn = actionButton("grid", t("toolbar.table"), handleTableButton, "toolbar-table-btn");
   linksGroup.append(
     linkBtn,
-    actionButton("brackets", "Enlace interno ([[página]])", () => insertLink(true)),
+    actionButton("brackets", t("toolbar.link.internal"), () => insertLink(true)),
     tableBtn
   );
 
@@ -358,8 +359,8 @@ export function createEditorToolbar(doc, onTableEdit) {
       const sample = toggledLine(f, kind, kind === "quote" ? "bloque" : kind === "task" ? "tarea" : "elemento");
       setTitle(btn, `${btn.dataset.label} (${sample})`);
     }
-    setTitle(codeBlockBtn, f === "wikitext" ? "Bloque de código (<pre>)" : "Bloque de código (```)");
-    setTitle(linkBtn, f === "wikitext" ? "Enlace externo ([url texto])" : "Enlace Markdown ([texto](url))");
+    setTitle(codeBlockBtn, f === "wikitext" ? t("toolbar.code_block.wiki") : t("toolbar.code_block.md"));
+    setTitle(linkBtn, f === "wikitext" ? t("toolbar.link.external.wiki") : t("toolbar.link.md"));
     setTitle(tableBtn, `Editor de tabla ${formatLabel(f)} (▦)`);
   };
   bar.refresh(format());
