@@ -127,8 +127,8 @@ async fn parse_wikitext(
         .await
         .map_err(|e| format!("err.wiki.unreachable|{e}"))?;
     let bytes = wiki_body(response).await?;
-    let envelope: ParseEnvelope = serde_json::from_slice(&bytes)
-        .map_err(|_| "err.wiki.invalid_json".to_string())?;
+    let envelope: ParseEnvelope =
+        serde_json::from_slice(&bytes).map_err(|_| "err.wiki.invalid_json".to_string())?;
     if let Some(error) = envelope.error {
         return Err(format!("err.wiki.api|{}", error.info));
     }
@@ -580,10 +580,11 @@ fn set_recent_files(
         submenu.remove(&entry).map_err(err)?;
     }
     if paths.is_empty() {
-        let none = MenuItemBuilder::with_id("recent_none", lbl("file.recent_none", "Sin recientes"))
-            .enabled(false)
-            .build(&app)
-            .map_err(err)?;
+        let none =
+            MenuItemBuilder::with_id("recent_none", lbl("file.recent_none", "Sin recientes"))
+                .enabled(false)
+                .build(&app)
+                .map_err(err)?;
         return submenu.append(&none).map_err(err);
     }
     for (index, path) in paths.iter().enumerate().take(20) {
@@ -595,9 +596,10 @@ fn set_recent_files(
     submenu
         .append(&PredefinedMenuItem::separator(&app).map_err(err)?)
         .map_err(err)?;
-    let clear = MenuItemBuilder::with_id("recent_clear", lbl("file.recent_clear", "Vaciar recientes"))
-        .build(&app)
-        .map_err(err)?;
+    let clear =
+        MenuItemBuilder::with_id("recent_clear", lbl("file.recent_clear", "Vaciar recientes"))
+            .build(&app)
+            .map_err(err)?;
     submenu.append(&clear).map_err(err)
 }
 
@@ -666,22 +668,42 @@ fn build_menu(app: &tauri::AppHandle, labels: &MenuLabelMap) -> tauri::Result<()
     *app.state::<RecentMenu>().0.lock().unwrap() = Some(recientes.clone());
 
     let archivo = SubmenuBuilder::new(app, lbl("file", "Archivo"))
-        .item(&item("new", &lbl("file.new", "Nuevo"), Some("CmdOrCtrl+N"))?)
-        .item(&item("open", &lbl("file.open", "Abrir…"), Some("CmdOrCtrl+O"))?)
+        .item(&item(
+            "new",
+            &lbl("file.new", "Nuevo"),
+            Some("CmdOrCtrl+N"),
+        )?)
+        .item(&item(
+            "open",
+            &lbl("file.open", "Abrir…"),
+            Some("CmdOrCtrl+O"),
+        )?)
         .item(&recientes)
         .separator()
-        .item(&item("save", &lbl("file.save", "Guardar"), Some("CmdOrCtrl+S"))?)
+        .item(&item(
+            "save",
+            &lbl("file.save", "Guardar"),
+            Some("CmdOrCtrl+S"),
+        )?)
         .item(&item(
             "save_as",
             &lbl("file.save_as", "Guardar como…"),
             Some("CmdOrCtrl+Shift+S"),
         )?)
         .separator()
-        .item(&item("export_pdf", &lbl("file.export_pdf", "Exportar (PDF)…"), Some("CmdOrCtrl+E"))?)
+        .item(&item(
+            "export_pdf",
+            &lbl("file.export_pdf", "Exportar (PDF)…"),
+            Some("CmdOrCtrl+E"),
+        )?)
         .separator()
         .item(&prefs_mermaid)
         .separator()
-        .item(&item("close_tab", &lbl("file.close_tab", "Cerrar pestaña"), Some("CmdOrCtrl+W"))?)
+        .item(&item(
+            "close_tab",
+            &lbl("file.close_tab", "Cerrar pestaña"),
+            Some("CmdOrCtrl+W"),
+        )?)
         .build()?;
 
     let edicion = SubmenuBuilder::new(app, lbl("edit", "Edición"))
@@ -706,16 +728,28 @@ fn build_menu(app: &tauri::AppHandle, labels: &MenuLabelMap) -> tauri::Result<()
             &lbl("view.source", "Código fuente"),
             Some("CmdOrCtrl+1"),
         )?)
-        .item(&item("mode_split", &lbl("view.split", "Vista dividida"), Some("CmdOrCtrl+2"))?)
+        .item(&item(
+            "mode_split",
+            &lbl("view.split", "Vista dividida"),
+            Some("CmdOrCtrl+2"),
+        )?)
         .item(&item(
             "mode_rendered",
             &lbl("view.rendered", "Texto renderizado"),
             Some("CmdOrCtrl+3"),
         )?)
         .separator()
-        .item(&item("outline", &lbl("view.outline", "Esquema de encabezados"), None)?)
+        .item(&item(
+            "outline",
+            &lbl("view.outline", "Esquema de encabezados"),
+            None,
+        )?)
         .separator()
-        .item(&item("zen", &lbl("view.zen", "Modo zen"), Some("CmdOrCtrl+Shift+Z"))?)
+        .item(&item(
+            "zen",
+            &lbl("view.zen", "Modo zen"),
+            Some("CmdOrCtrl+Shift+Z"),
+        )?)
         .build()?;
 
     let ventana = SubmenuBuilder::new(app, lbl("window", "Ventana"))
@@ -740,7 +774,11 @@ fn build_menu(app: &tauri::AppHandle, labels: &MenuLabelMap) -> tauri::Result<()
             Some("Alt+Shift+Right"),
         )?)
         .separator()
-        .item(&item("gather_windows", &lbl("window.gather", "Reunir todas las ventanas"), None)?)
+        .item(&item(
+            "gather_windows",
+            &lbl("window.gather", "Reunir todas las ventanas"),
+            None,
+        )?)
         .separator()
         .minimize()
         .build()?;
@@ -751,7 +789,11 @@ fn build_menu(app: &tauri::AppHandle, labels: &MenuLabelMap) -> tauri::Result<()
             &lbl("help.palette", "Paleta de comandos…"),
             Some("CmdOrCtrl+Shift+P"),
         )?)
-        .item(&item("shortcuts", &lbl("help.shortcuts", "Atajos de teclado"), Some("F1"))?)
+        .item(&item(
+            "shortcuts",
+            &lbl("help.shortcuts", "Atajos de teclado"),
+            Some("F1"),
+        )?)
         .build()?;
 
     let menu = MenuBuilder::new(app)
