@@ -27,6 +27,12 @@ assert.equal(bundle.fileAssociations[1].mimeType, "text/x-wiki");
 assert.deepEqual(bundle.fileAssociations[1].ext, ["wiki", "wikitext"]);
 assert.ok(existsSync(join(root, "node_modules", "dompurify", "dist", "purify.es.mjs")));
 assert.doesNotMatch(config.app.security.csp, /cdn\.jsdelivr\.net/);
+// CodeMirror y Mermaid inyectan <style> en tiempo de ejecución. Si Tauri añade
+// hashes o nonce a style-src, la CSP ignora 'unsafe-inline' y el editor queda
+// sin estilos base (regresión de v0.6.0: contenido apilado bajo la numeración).
+assert.match(config.app.security.csp, /style-src [^;]*'unsafe-inline'/, "style-src necesita 'unsafe-inline'");
+assert.ok(config.app.security.dangerousDisableAssetCspModification?.includes("style-src"), "Tauri no debe modificar style-src");
+assert.match(config.app.security.csp, /media-src [^;]*asset:/, "la vista previa necesita media-src con asset:");
 assert.deepEqual(config.app.security.assetProtocol.scope, [], "los assets locales se autorizan por archivo en runtime");
 const opener = capability.permissions.find((permission) => permission?.identifier === "opener:allow-open-url");
 assert.deepEqual(opener?.allow, [{ url: "https://*" }, { url: "http://*" }]);
