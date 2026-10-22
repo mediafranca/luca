@@ -283,7 +283,7 @@ concentran la mayor parte.
 
 - [x] Versionar `package-lock.json` y usar `npm ci` en CI para builds
   reproducibles.
-- [ ] Auditar dependencias npm y Cargo por uso real, licencia, tamaño y
+- [x] Auditar dependencias npm y Cargo por uso real, licencia, tamaño y
   mantenimiento antes de añadir nuevas.
 - [x] Confirmar que el antiguo árbol Swift `.build/` no es fuente ni artefacto de
   distribución; después retirarlo del repositorio en un cambio explícito y
