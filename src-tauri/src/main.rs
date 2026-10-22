@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::{collections::HashMap, sync::atomic::AtomicUsize};
-use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, Submenu, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
 mod file_io;
@@ -339,6 +339,73 @@ fn print_with_margins(webview: tauri::Webview) -> Result<(), String> {
     }
 }
 
+// Submenú «Archivo ▸ Abrir reciente». El frontend guarda la lista de recientes
+// y la vuelca aquí con `set_recent_files`; los ítems emiten `recent:<índice>`.
+struct RecentMenu(Mutex<Option<Submenu<tauri::Wry>>>);
+
+fn recent_label(path: &str) -> String {
+    let p = std::path::Path::new(path);
+    let name = p
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.to_string());
+    match p
+        .parent()
+        .and_then(|d| d.file_name())
+        .map(|d| d.to_string_lossy().to_string())
+    {
+        Some(dir) if !dir.is_empty() => format!("{name}  —  {dir}"),
+        _ => name,
+    }
+}
+
+#[tauri::command]
+fn set_recent_files(
+    app: tauri::AppHandle,
+    menu: tauri::State<RecentMenu>,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    let guard = menu.0.lock().unwrap();
+    let Some(submenu) = guard.as_ref() else {
+        return Ok(());
+    };
+    let err = |e: tauri::Error| e.to_string();
+    for entry in submenu.items().map_err(err)? {
+        submenu.remove(&entry).map_err(err)?;
+    }
+    if paths.is_empty() {
+        let none = MenuItemBuilder::with_id("recent_none", "Sin recientes")
+            .enabled(false)
+            .build(&app)
+            .map_err(err)?;
+        return submenu.append(&none).map_err(err);
+    }
+    for (index, path) in paths.iter().enumerate().take(20) {
+        let item = MenuItemBuilder::with_id(format!("recent:{index}"), recent_label(path))
+            .build(&app)
+            .map_err(err)?;
+        submenu.append(&item).map_err(err)?;
+    }
+    submenu
+        .append(&PredefinedMenuItem::separator(&app).map_err(err)?)
+        .map_err(err)?;
+    let clear = MenuItemBuilder::with_id("recent_clear", "Vaciar recientes")
+        .build(&app)
+        .map_err(err)?;
+    submenu.append(&clear).map_err(err)
+}
+
+#[cfg(test)]
+mod recent_tests {
+    use super::recent_label;
+
+    #[test]
+    fn etiqueta_con_nombre_y_carpeta() {
+        assert_eq!(recent_label("/home/h/textos/nota.md"), "nota.md  —  textos");
+        assert_eq!(recent_label("nota.md"), "nota.md");
+    }
+}
+
 // Menú nativo. Los ítems propios emiten su id al frontend (evento "menu"); los
 // predefinidos (deshacer/copiar/pegar, salir…) los maneja el sistema.
 fn build_menu(app: &tauri::App) -> tauri::Result<()> {
@@ -371,9 +438,19 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .quit()
         .build()?;
 
+    let recientes = SubmenuBuilder::new(app, "Abrir reciente")
+        .item(
+            &MenuItemBuilder::with_id("recent_none", "Sin recientes")
+                .enabled(false)
+                .build(app)?,
+        )
+        .build()?;
+    app.manage(RecentMenu(Mutex::new(Some(recientes.clone()))));
+
     let archivo = SubmenuBuilder::new(app, "Archivo")
         .item(&item("new", "Nuevo", Some("CmdOrCtrl+N"))?)
         .item(&item("open", "Abrir…", Some("CmdOrCtrl+O"))?)
+        .item(&recientes)
         .separator()
         .item(&item("save", "Guardar", Some("CmdOrCtrl+S"))?)
         .item(&item(
@@ -417,6 +494,8 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
             "Texto renderizado",
             Some("CmdOrCtrl+3"),
         )?)
+        .separator()
+        .item(&item("outline", "Esquema de encabezados", None)?)
         .separator()
         .item(&item("zen", "Modo zen", Some("CmdOrCtrl+Shift+Z"))?)
         .build()?;
@@ -519,6 +598,7 @@ fn main() {
             stat,
             allow_preview_asset,
             take_opened_files,
+            set_recent_files,
             take_new_document,
             print_with_margins,
             parse_wikitext,

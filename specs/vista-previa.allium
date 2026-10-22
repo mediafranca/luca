@@ -81,7 +81,9 @@ surface Editor {
         -- nombre o atajo y ejecuta las mismas acciones que menús e interfaz.
 
     @guarantee NavegacionYEstado
-        -- El esquema permite saltar a encabezados Markdown o Wikitext. La
+        -- El esquema es un panel lateral opcional (botón de la barra, menú
+        -- Vista o paleta) que permite saltar a encabezados Markdown o Wikitext;
+        -- los archivos recientes viven en el menú nativo Archivo. La
         -- barra de estado muestra línea, columna, UTF-8, fin de línea y formato
         -- del documento activo.
 }

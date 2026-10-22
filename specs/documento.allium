@@ -148,6 +148,12 @@ rule CambiarFormato {
     @guarantee OverrideFueraDelArchivo
         -- En documentos con ruta, la selección explícita se recuerda por ruta
         -- en el estado local de luca y nunca se inserta dentro del archivo.
+
+    @guarantee ComandosSiguenAlFormato
+        -- La barra de herramientas y el editor de tablas emiten el marcado del
+        -- formato interpretado (Markdown o Wikitext) y no se ocultan al cambiar.
+        -- Una acción sin equivalente en el formato (lista de tareas en
+        -- Wikitext) no está disponible en vez de insertar sintaxis ajena.
 }
 
 ------------------------------------------------------------

@@ -39,9 +39,12 @@ archivos no indexados, o si el grafo no devuelve información suficiente.
 | `ui/app.js` | Documentos y pestañas, apertura/guardado, preview Markdown/Mermaid, modos, preferencias e IPC con Tauri. |
 | `ui/editor.src.js` | `createMarkdownEditor`, API del editor CodeMirror 6, temas y medición tipográfica. Se empaqueta; no se importa directamente en el navegador. |
 | `ui/block-edit.js` | Edición por bloques en la vista renderizada: abre un bloque con su Markdown in situ, sincroniza su rango con el documento y lo cierra. |
+| `ui/toolbar.js`, `ui/table-editor.js` | Barra de herramientas y editor visual de tablas. Leen `doc.format` en cada acción y emiten Markdown o Wikitext. |
+| `ui/format-syntax.js` | Sintaxis por formato (inline, encabezados, listas, bloques, enlaces). Módulo puro con tests en Node. |
+| `ui/markdown-table.js`, `ui/wikitext-table.js` | Lectura y escritura de tablas Markdown (`\|`) y Wikitext (`{\| … \|}`) sobre el mismo modelo. |
 | `ui/index.html` | DOM, estilos, tokens de Vera, fuentes locales, modos source/split/rendered, zen e impresión. |
 | `src-tauri/src/main.rs` | I/O de archivos, mtime, menú nativo y apertura desde el sistema. |
-| `src-tauri/tauri.conf.json` | Empaquetado, CSP, ventana, asociación `.md`/`.markdown` y hooks de desarrollo. |
+| `src-tauri/tauri.conf.json` | Empaquetado, CSP, ventana, asociación `.md`/`.markdown` y hooks de desarrollo. `dangerousDisableAssetCspModification: ["style-src"]` es imprescindible: sin él Tauri añade hashes a `style-src`, `'unsafe-inline'` deja de valer y los `<style>` que inyectan CodeMirror y Mermaid quedan bloqueados. |
 | `src-tauri/capabilities/default.json` | Permisos de la ventana principal y diálogos. |
 | `scripts/vendor.mjs` | Copia las dependencias runtime locales y empaqueta CodeMirror con esbuild. |
 | `specs/*.allium` | Contratos de comportamiento: raíz, documentos, preview e integración con Vera. |
@@ -63,8 +66,9 @@ archivos no indexados, o si el grafo no devuelve información suficiente.
   Mermaid y sus motores ELK, tidy-tree y ZenUML; el CDN es respaldo.
 - Conserva los tokens CSS compartidos por interfaz, CodeMirror y Mermaid,
   claro/oscuro, fuentes locales y la medición tras cargar fuentes.
-- Los menús nativos emiten `menu`; las aperturas emiten `open-file` y el arranque
-  consulta `take_opened_file`. Si cambias estos contratos, revisa ambos lados.
+- Los menús nativos emiten `menu`; las aperturas desde el sistema o una segunda
+  instancia emiten `launch-request` y el frontend consulta `take_opened_files`.
+  Si cambias estos contratos, revisa ambos lados.
 - Si cambia el comportamiento observable, actualiza la spec correspondiente.
   Una garantía escrita en la spec no prueba que esté implementada: señala las
   discrepancias encontradas sin ampliar por tu cuenta el alcance de la tarea.

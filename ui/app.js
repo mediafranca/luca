@@ -39,9 +39,12 @@ async function ensurePreviewRuntime(source = "") {
     marked.use({
       renderer: {
         code(code, lang) {
+          // Escapar siempre: el texto del fence pasa por DOMPurify y luego se lee
+          // con textContent, así que `<`, `&` y `|` del diagrama llegan intactos.
+          const escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;");
           return lang === "mermaid"
-            ? `<pre class="mermaid">${code}</pre>`
-            : `<pre><code>${code.replace(/</g, "&lt;")}</code></pre>`;
+            ? `<pre class="mermaid">${escaped}</pre>`
+            : `<pre><code>${escaped}</code></pre>`;
         },
       },
     });
@@ -136,7 +139,7 @@ function saveSessionSoon() {
 }
 function saveSessionNow() {
   if (restoringSession) return;
-  const snapshot = sessionSnapshot(docs.map((doc) => ({ ...doc, content: doc.ed.getDoc() })), active?.id);
+  const snapshot = sessionSnapshot(docs.map((doc) => ({ ...doc, content: doc.ed.getSource() })), active?.id);
   try { localStorage.setItem(sessionStorageKey, JSON.stringify(snapshot)); } catch {}
 }
 function rememberRecent(path) {
@@ -145,11 +148,19 @@ function rememberRecent(path) {
   renderRecentFiles();
 }
 function renderRecentFiles() {
-  const select = document.getElementById("recentFiles");
-  if (!select) return;
-  const paths = readJsonStorage(RECENT_KEY, []);
-  select.replaceChildren(new Option("Recientes…", ""), ...paths.map((path) => new Option(baseName(path), path)));
-  for (const option of select.options) if (option.value) option.title = option.value;
+  // Los recientes viven en el submenú nativo «Archivo ▸ Abrir reciente».
+  if (!TAURI) return;
+  TAURI.core.invoke("set_recent_files", { paths: readJsonStorage(RECENT_KEY, []) }).catch(() => {});
+}
+async function openRecent(index) {
+  const path = readJsonStorage(RECENT_KEY, [])[index];
+  if (!path) return;
+  try { await openPath(path); }
+  catch { alert(`No se pudo abrir el archivo reciente:\n${path}`); }
+}
+function clearRecent() {
+  try { localStorage.removeItem(RECENT_KEY); } catch {}
+  renderRecentFiles();
 }
 
 const FORMAT_OVERRIDES_KEY = "luca.documentFormats";
@@ -181,7 +192,10 @@ const rememberFormatSelection = (doc) => {
 
 // Una sola barra de herramientas, en la barra superior; opera sobre el
 // documento activo (el getter resuelve `doc.ed` en cada clic).
-document.getElementById("modes").after(createEditorToolbar({ get ed() { return active?.block?.ed ?? active?.ed; } }));
+document.getElementById("modes").after(createEditorToolbar({
+  get ed() { return active?.block?.ed ?? active?.ed; },
+  get format() { return active?.format ?? "markdown"; },
+}));
 
 const dark = () => isCurrentDark();
 const baseName = (p) => (p ? p.split(/[\\/]/).pop() : "sin título");
@@ -561,15 +575,6 @@ async function openFile() {
   if (typeof path === "string") await openPath(path);
 }
 
-document.getElementById("recentFiles")?.addEventListener("change", async (event) => {
-  const path = event.target.value;
-  event.target.value = "";
-  if (path && TAURI) {
-    try { await openPath(path); }
-    catch { alert(`No se pudo abrir el archivo reciente:\n${path}`); }
-  }
-});
-
 async function saveDoc(doc, forceDialog = false) {
   const previousPath = doc.path;
   let path = previousPath;
@@ -582,7 +587,9 @@ async function saveDoc(doc, forceDialog = false) {
     // ¿cambió fuera de luca (p.ej. Vera) desde que lo leímos? No pisar en silencio.
     const cur = await TAURI.core.invoke("stat", { path });
     if (cur !== null && doc.lastMtime !== null && cur !== doc.lastMtime &&
-        !confirm("El archivo cambió fuera de luca. ¿Sobrescribir?")) return;
+        // En Tauri el plugin de diálogos vuelve confirm() asíncrono: sin await la
+        // condición nunca bloquea y se sobrescribe antes de que el autor responda.
+        !(await confirm("El archivo cambió fuera de luca. ¿Sobrescribir?"))) return;
   }
   const claimsNewPath = Boolean(TAURI && path !== previousPath);
   if (claimsNewPath) {
@@ -590,7 +597,7 @@ async function saveDoc(doc, forceDialog = false) {
     if (owner) { await TAURI.core.invoke("focus_window", { label: owner }); return; }
   }
   try {
-    doc.lastMtime = await TAURI.core.invoke("write_file", { path, contents: doc.ed.getDoc() });
+    doc.lastMtime = await TAURI.core.invoke("write_file", { path, contents: doc.ed.getSource() });
   } catch (error) {
     if (claimsNewPath) await TAURI.core.invoke("release_document", { path, windowLabel }).catch(() => {});
     throw error;
@@ -613,8 +620,8 @@ async function saveDoc(doc, forceDialog = false) {
 
 const newDoc = () => makeDoc("", null, newDocumentFormat());
 
-function closeDoc(doc, { force = false, release = true, replacement = true } = {}) {
-  if (!force && doc.dirty && !confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`)) return false;
+async function closeDoc(doc, { force = false, release = true, replacement = true } = {}) {
+  if (!force && doc.dirty && !(await confirm(`"${baseName(doc.path)}" tiene cambios sin guardar. ¿Cerrar igual?`))) return false;
   const i = docs.indexOf(doc);
   exitBlockEdit(doc, false);
   doc.editorEl.remove();
@@ -632,7 +639,7 @@ async function moveTabToWindow(doc, target = null) {
   if (!TAURI || !doc) return;
   const targetLabel = target || await TAURI.core.invoke("create_editor_window");
   await TAURI.core.invoke("transfer_tab", { target: targetLabel, payload: transferableTab(doc, document.body.dataset.mode) });
-  closeDoc(doc, { force: true, release: false, replacement: false });
+  await closeDoc(doc, { force: true, release: false, replacement: false });
   if (docs.length === 0) await TAURI.window.getCurrentWindow().close();
 }
 
@@ -640,7 +647,7 @@ async function receiveTransferredTabs() {
   if (!TAURI) return;
   const incoming = await TAURI.core.invoke("take_transferred_tabs", { windowLabel });
   if (incoming.length && docs.length === 1 && isDisposableBlank(docs[0])) {
-    closeDoc(docs[0], { force: true, replacement: false });
+    await closeDoc(docs[0], { force: true, replacement: false });
   }
   for (const payload of incoming) {
     const doc = makeDoc(payload.editorState?.doc || "", payload.path, payload.formatSelection || "auto", payload);
@@ -692,6 +699,9 @@ if (TAURI) {
     else if (id === "mode_split") applyMode("split");
     else if (id === "mode_rendered") applyMode("rendered");
     else if (id === "zen") toggleZen();
+    else if (id === "outline") toggleOutline();
+    else if (id === "recent_clear") clearRecent();
+    else if (id.startsWith("recent:")) openRecent(Number(id.slice(7)));
     else if (id === "move_tab_left") { if (a) moveTab(a, -1); }
     else if (id === "move_tab_right") { if (a) moveTab(a, 1); }
     else if (id === "about") openAbout();
@@ -739,7 +749,9 @@ dividerEl.addEventListener("dblclick", () => {
 const formatSelect = document.getElementById("documentFormat");
 const formatWarning = document.getElementById("formatWarning");
 const editorToolbar = document.querySelector(".editor-toolbar");
-const outlineSelect = document.getElementById("documentOutline");
+const outlineEl = document.getElementById("outline");
+const outlineBtn = document.getElementById("outlineBtn");
+const OUTLINE_KEY = "luca.outline";
 
 function updateCursorStatus(doc) {
   if (!doc || doc !== active) return;
@@ -750,28 +762,57 @@ function updateCursorStatus(doc) {
   if (encoding) encoding.textContent = `UTF-8 · ${doc.lineEnding}`;
 }
 
+// Panel lateral de encabezados (apagado por defecto; botón en la barra, menú
+// Vista y paleta). Salta al encabezado elegido en el editor.
 function updateOutline(doc) {
-  if (!outlineSelect || !doc || doc !== active) return;
+  const list = outlineEl?.querySelector("ul");
+  if (!list || outlineEl.hidden || !doc || doc !== active) return;
   const headings = documentHeadings(doc.ed.getDoc(), doc.format);
-  outlineSelect.replaceChildren(new Option(headings.length ? "Esquema…" : "Sin encabezados", ""), ...headings.map((heading) => {
-    const option = new Option(`${"· ".repeat(Math.max(0, heading.level - 1))}${heading.label}`, String(heading.offset));
-    option.title = heading.label;
-    return option;
+  list.replaceChildren(...headings.map((heading) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = heading.label;
+    button.title = heading.label;
+    button.style.setProperty("--level", String(Math.max(1, heading.level)));
+    button.addEventListener("click", () => {
+      if (!active) return;
+      active.ed.setSelection(heading.offset);
+      active.ed.focus();
+    });
+    item.append(button);
+    return item;
   }));
+  if (!headings.length) {
+    const empty = document.createElement("li");
+    empty.className = "empty";
+    empty.textContent = "Sin encabezados";
+    list.append(empty);
+  }
 }
 
-outlineSelect?.addEventListener("change", () => {
-  if (!active || outlineSelect.value === "") return;
-  active.ed.setSelection(Number(outlineSelect.value));
-  outlineSelect.value = "";
-});
+function setOutline(on) {
+  if (!outlineEl) return;
+  outlineEl.hidden = !on;
+  document.body.dataset.outline = on ? "on" : "off";
+  outlineBtn?.setAttribute("aria-pressed", String(on));
+  outlineBtn?.classList.toggle("active", on);
+  try { localStorage.setItem(OUTLINE_KEY, on ? "on" : "off"); } catch {}
+  if (on && active) updateOutline(active);
+  active?.ed.remeasure?.();
+}
+const toggleOutline = () => setOutline(Boolean(outlineEl?.hidden));
+if (outlineBtn) outlineBtn.innerHTML = icon("list");
+outlineBtn?.addEventListener("click", toggleOutline);
+try { setOutline(localStorage.getItem(OUTLINE_KEY) === "on"); } catch { setOutline(false); }
 
 function updateFormatControls(doc) {
   if (!doc || !formatSelect) return;
   formatSelect.value = doc.formatSelection;
   formatWarning.hidden = !extensionMismatch(doc.path, doc.formatSelection);
   formatWarning.title = formatWarning.hidden ? "" : "El formato elegido no coincide con la extensión; se guardará sin convertir.";
-  if (editorToolbar) editorToolbar.hidden = doc.format === "wikitext";
+  // La barra no se oculta en Wikitext: adapta su marcado al formato del documento.
+  if (editorToolbar) { editorToolbar.hidden = false; editorToolbar.refresh?.(doc.format); }
   document.body.dataset.format = doc.format;
   updateOutline(doc);
 }
@@ -833,6 +874,7 @@ const commandList = () => [
   { label: "Vista dividida", shortcut: `${shortcutPrefix}2`, run: () => applyMode("split") },
   { label: "Texto renderizado", shortcut: `${shortcutPrefix}3`, run: () => applyMode("rendered") },
   { label: "Modo zen", shortcut: `${shortcutPrefix}Shift+Z`, run: () => toggleZen() },
+  { label: "Esquema de encabezados", shortcut: "", run: () => toggleOutline() },
   { label: "Preferencias", shortcut: `${shortcutPrefix},`, run: openPrefs },
   { label: "Exportar PDF", shortcut: `${shortcutPrefix}E`, run: exportPdf },
 ];
@@ -1671,7 +1713,7 @@ async function restorePreviousSession() {
       if (item.path && TAURI) {
         const owner = await TAURI.core.invoke("claim_document", { path: item.path, windowLabel });
         if (owner) {
-          closeDoc(doc, { force: true, release: false, replacement: false });
+          await closeDoc(doc, { force: true, release: false, replacement: false });
           continue;
         }
       }
