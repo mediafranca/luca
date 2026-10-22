@@ -226,6 +226,46 @@ acción explícita.
   actualización, CDN y previsualización MediaWiki.
 - [x] Documentación de recuperación, desinstalación y ubicación de datos.
 
+## Hito 6 — Flatpak y contribución a la comunidad
+
+Publicar Luca en Flathub no es sólo sumar otro instalador: es adoptar un canal
+comunitario reproducible, revisable y mantenido. El identificador estable será
+`net.mediafranca.luca`. La entrega debe preservar el sandbox de Flatpak y no
+obtener una aprobación concediendo acceso general al equipo.
+
+La política de Flathub vigente prohíbe manifiestos generados o asistidos por IA
+y la automatización del PR de envío. Herbert redactará y certificará el
+manifiesto y presentará el PR; los agentes pueden investigar, comprobar,
+diagnosticar y revisar material escrito por él, pero no producir ese manifiesto,
+el mensaje de envío ni respuestas de revisión.
+
+- [ ] Preparar en el repositorio upstream un archivo AppStream completo y
+  validado, desktop file exportable, iconos con el ID y capturas aprobadas.
+- [ ] Incorporar una localización inglesa completa y revisada por una persona
+  para interfaz, ayuda, metadatos y documentación visible en Flathub.
+- [ ] Documentar qué funciones necesitan red, portales de archivos, apertura de
+  enlaces, Wayland/X11 y aceleración; justificar cada permiso del sandbox.
+- [ ] Hacer que diálogos y apertura/guardado usen portales correctamente, sin
+  `--filesystem=home` ni acceso amplio al host.
+- [ ] Documentar un build desde fuentes completamente offline y reproducible;
+  todas las dependencias deben tener fuentes públicas y hashes fijados.
+- [ ] Herbert redacta y certifica `net.mediafranca.luca.yml`; Luca aporta un
+  verificador que comprueba ID, versión, metadatos, permisos y fuentes sin
+  reescribir el manifiesto.
+- [ ] Construir, instalar y ejecutar localmente con `flatpak-builder`; probar
+  abrir/guardar, asociaciones, varias ventanas, enlaces, preview MediaWiki,
+  recuperación y desinstalación dentro del sandbox.
+- [ ] Publicar un `.flatpak` de prueba con tamaño y SHA-256 para la comunidad,
+  claramente separado de la publicación oficial de Flathub.
+- [ ] Herbert abre el PR contra `flathub/new-pr`, declara la asistencia de IA
+  exigida por la política y responde personalmente a la revisión comunitaria.
+- [ ] Tras aceptación, verificar la ficha pública, descargas, actualización,
+  permisos mostrados y procedimiento de mantenimiento de cada nueva versión.
+
+Referencias primarias: [requisitos de Flathub](https://docs.flathub.org/docs/for-app-authors/requirements),
+[permisos del sandbox](https://docs.flatpak.org/en/latest/sandbox-permissions.html)
+y [guía Flatpak de Tauri 2](https://v2.tauri.app/distribute/flatpak/).
+
 ## Optimización, seguridad y limpieza
 
 ### El WebView no es el navegador accidental
