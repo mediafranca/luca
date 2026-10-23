@@ -9,3 +9,11 @@ node_modules/
 *.swp
 *.swo
 *~
+
+# Notas y guía privadas; salidas de empaquetado
+/AGENTS.md
+/docs/notas.md
+/flatpak/build-dir/
+/flatpak/flatpak-repo/
+/flatpak/.flatpak-builder/
+/flatpak/*.flatpak
