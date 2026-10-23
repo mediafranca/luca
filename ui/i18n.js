@@ -174,6 +174,27 @@ const es = {
   "prefs.theme.dark": "oscuro",
   "prefs.font.custom": "Personalizada",
 
+  // ---- Preferencias: el comando de terminal ----
+  "prefs.cli.group": "Línea de comandos",
+  "prefs.cli.note":
+    "Permite abrir archivos desde la terminal con <code>luca notas.md</code>. Los paquetes " +
+    ".deb y .rpm y el instalador .msi ya dejan el comando disponible; el .dmg de macOS y el " +
+    "AppImage no, porque no instalan nada fuera de su carpeta. Luca crea un único enlace en " +
+    "una carpeta que ya está en tu PATH y en la que puedes escribir: nunca pide contraseña " +
+    "ni modifica el PATH.",
+  "prefs.cli.on_path": "Disponible como <code>luca</code> · {path}",
+  "prefs.cli.linked": "Enlazado en {path}",
+  "prefs.cli.occupied":
+    "Ya hay otro <code>luca</code> en {path}. Luca no lo reemplaza: retíralo tú si quieres " +
+    "poner el suyo.",
+  "prefs.cli.missing": "No disponible en la terminal",
+  "prefs.cli.none":
+    "No hay ninguna carpeta de tu PATH donde Luca pueda escribir sin privilegios. Puedes " +
+    "crear el enlace tú con <code>ln -s</code>.",
+  "prefs.cli.where": "Instalar en",
+  "prefs.cli.install": "Instalar el comando",
+  "prefs.cli.remove": "Quitar el comando",
+
   // ---- Preferencias: diagramas y soporte ----
   "prefs.diagrams.group": "Diagramas",
   "prefs.mermaid.theme": "Tema de Mermaid",
@@ -334,6 +355,9 @@ const es = {
   "err.styles.not_css": "La wiki no devolvió CSS",
   "err.styles.no_modules": "Sin módulos de estilo que pedir",
   "err.styles.not_utf8": "Los estilos no son UTF-8",
+  "err.cli.not_candidate": "Esa carpeta no es una de las que Luca puede usar",
+  "err.cli.occupied": "Hay otro archivo con ese nombre; Luca no lo reemplaza",
+  "err.cli.failed": "No se pudo crear el enlace: {0}",
   "err.window.gone": "La ventana de destino ya no existe",
   "err.print.unsupported": "sin impresión nativa en esta plataforma",
 };
@@ -499,6 +523,27 @@ const en = {
   "prefs.theme.dark": "dark",
   "prefs.font.custom": "Custom",
 
+  // ---- Settings: the terminal command ----
+  "prefs.cli.group": "Command line",
+  "prefs.cli.note":
+    "Lets you open files from the terminal with <code>luca notes.md</code>. The .deb and " +
+    ".rpm packages and the .msi installer already provide the command; the macOS .dmg and " +
+    "the AppImage do not, because they install nothing outside their own folder. Luca " +
+    "creates a single link in a folder already on your PATH that you can write to: it never " +
+    "asks for a password and never modifies the PATH.",
+  "prefs.cli.on_path": "Available as <code>luca</code> · {path}",
+  "prefs.cli.linked": "Linked at {path}",
+  "prefs.cli.occupied":
+    "There is already another <code>luca</code> at {path}. Luca will not replace it: remove " +
+    "it yourself if you want Luca's.",
+  "prefs.cli.missing": "Not available in the terminal",
+  "prefs.cli.none":
+    "No folder on your PATH is writable without privileges. You can create the link " +
+    "yourself with <code>ln -s</code>.",
+  "prefs.cli.where": "Install in",
+  "prefs.cli.install": "Install the command",
+  "prefs.cli.remove": "Remove the command",
+
   // ---- Settings: diagrams and support ----
   "prefs.diagrams.group": "Diagrams",
   "prefs.mermaid.theme": "Mermaid theme",
@@ -658,6 +703,9 @@ const en = {
   "err.styles.not_css": "The wiki returned no CSS",
   "err.styles.no_modules": "No style modules to request",
   "err.styles.not_utf8": "The styles are not UTF-8",
+  "err.cli.not_candidate": "That folder is not one Luca can use",
+  "err.cli.occupied": "Another file by that name is there; Luca will not replace it",
+  "err.cli.failed": "Could not create the link: {0}",
   "err.window.gone": "The target window no longer exists",
   "err.print.unsupported": "no native printing on this platform",
 };

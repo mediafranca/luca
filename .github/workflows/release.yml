@@ -64,6 +64,17 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Firma de macOS. Sin secretos, "-" hace una firma ad-hoc: el bundle
+          # pasa a tener _CodeSignature y deja de ser «no usable signature»,
+          # aunque Gatekeeper siga pidiendo permiso por no estar notarizada.
+          # Si algún día se añaden los secretos de Developer ID, este mismo
+          # workflow firma y notariza sin cambiar nada más.
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: v__VERSION__
           releaseName: "Luca v__VERSION__"
@@ -74,7 +85,15 @@ jobs:
             - **Windows**: `Luca_…_x64-setup.exe`
             - **Linux**: `.AppImage` (cualquier distribución), `.deb` o `.rpm`
 
-            Si macOS dice que Luca «está dañada», no lo está: la app aún no lleva firma de Apple. Prueba clic derecho → Abrir. Si el aviso sigue, abre Terminal, pega `xattr -cr /Applications/Luca.app` y pulsa Intro. Más detalles en el README.
+            **macOS:** Luca todavía no está notarizada por Apple. Si al abrirla **rebota en el Dock y no abre nunca**, o si macOS dice que «está dañada», no lo está: es la cuarentena de Gatekeeper. Abre Terminal, pega esto y pulsa Intro:
+
+            ```
+            xattr -cr /Applications/Luca.app
+            ```
+
+            Después abre normal. «Abrir de todos modos» en Ajustes del Sistema **no basta**: autoriza la apertura pero no quita el atributo de cuarentena.
+
+            **Comando `luca` en la terminal:** los paquetes `.deb`, `.rpm` y el `.msi` ya lo dejan instalado. Con el `.dmg`, el AppImage o el `-setup.exe`, actívalo en Preferencias ▸ Generales ▸ Línea de comandos. Más detalles en el README.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

@@ -67,8 +67,6 @@ xattr -cr /Applications/Luca.app
 
 ## Línea de comandos
 
-La instalación registra el comando Luca:
-
     luca pagina.md notas.md
     luca --new
     luca --help
@@ -76,6 +74,37 @@ La instalación registra el comando Luca:
 
 Si Luca ya está abierto, los archivos se entregan a la instancia existente y se
 activa la ventana que corresponda.
+
+Que el comando exista depende del instalador:
+
+| Instalación | ¿Queda el comando `luca`? |
+| --- | --- |
+| `.deb` / `.rpm` | Sí: instalan `/usr/bin/luca`. |
+| `.msi` (Windows) | Sí: el instalador añade su carpeta al `PATH`. |
+| `.dmg` (macOS) | No: el ejecutable vive dentro de `Luca.app`. |
+| `.AppImage` | No: no instala nada fuera del archivo. |
+| `-setup.exe` (Windows) | No. |
+
+En los tres últimos casos, **Preferencias ▸ Generales ▸ Línea de comandos**
+ofrece instalarlo: Luca crea un enlace en una carpeta que ya esté en tu `PATH` y
+en la que puedas escribir, sin pedir contraseña y sin modificar el `PATH`. Si
+prefieres hacerlo a mano:
+
+```sh
+# macOS y Linux (AppImage). Elige una carpeta de tu PATH donde puedas escribir.
+ln -s /Applications/Luca.app/Contents/MacOS/luca /usr/local/bin/luca   # macOS
+ln -s ~/Aplicaciones/Luca.AppImage ~/.local/bin/luca                   # AppImage
+```
+
+```powershell
+# Windows, si instalaste con -setup.exe: añade la carpeta a tu PATH de usuario.
+$luca = "$env:LOCALAPPDATA\Programs\Luca"
+[Environment]::SetEnvironmentVariable(
+  "Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$luca", "User")
+```
+
+En macOS, si Luca rebota en el Dock y no abre, es la cuarentena de Gatekeeper
+sobre un bundle sin firmar; ver más arriba `xattr -cr`.
 
 ## Desde el código
 

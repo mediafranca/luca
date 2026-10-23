@@ -51,6 +51,25 @@ rule EditarDiseno {
         -- pertenece al diseño ni viaja en el archivo exportado.
 }
 
+rule InstalarComando {
+    when: AutorInstalaComando(autor, carpeta)
+
+    @guarantee SinPrivilegios
+        -- luca sólo ofrece carpetas que ya están en el PATH del autor y en las
+        -- que puede escribir sin elevar privilegios. Nunca pide contraseña, no
+        -- modifica el PATH y no escribe en una carpeta que no haya ofrecido.
+
+    @guarantee NoPisaLoAjeno
+        -- Si ya existe un archivo con ese nombre que luca no haya creado, lo
+        -- deja intacto y lo dice. Retirar el comando sólo retira un enlace que
+        -- apunte a este ejecutable.
+
+    @guidance
+        -- Hace falta sólo donde el instalador no deja el comando: el .dmg de
+        -- macOS, el AppImage y el instalador NSIS. Los paquetes .deb y .rpm
+        -- instalan el ejecutable en el PATH y el .msi añade su carpeta.
+}
+
 surface Confianza {
     facing autor: luca/Autor
 
@@ -58,4 +77,5 @@ surface Confianza {
         AutorIniciaLuca(autor)
         AutorExportaDiagnostico(autor)
         AutorEditaDiseno(autor)
+        AutorInstalaComando(autor, carpeta)
 }

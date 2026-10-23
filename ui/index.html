@@ -599,6 +599,19 @@
 
           <div class="prefs-group" data-i18n="prefs.tokens.group">Tipografías y medidas del diseño actual</div>
           <div id="tokenFormGeneral"></div>
+          <div class="prefs-group" data-i18n="prefs.cli.group">Línea de comandos</div>
+          <p class="prefs-note" data-i18n-html="prefs.cli.note">Permite abrir archivos desde la
+            terminal con <code>luca notas.md</code>.</p>
+          <p class="prefs-note" id="cliState"></p>
+          <div class="prefs-row" id="cliWhereRow" hidden>
+            <label for="cliDir" data-i18n="prefs.cli.where">Instalar en</label>
+            <select id="cliDir"></select>
+          </div>
+          <div class="prefs-row prefs-row-buttons">
+            <button type="button" id="cliInstall" data-i18n="prefs.cli.install" hidden>Instalar el comando</button>
+            <button type="button" id="cliRemove" data-i18n="prefs.cli.remove" hidden>Quitar el comando</button>
+          </div>
+
           <div class="prefs-group" data-i18n="prefs.diagrams.group">Diagramas</div>
           <div class="prefs-row">
             <span>Tema de Mermaid</span>

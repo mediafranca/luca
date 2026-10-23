@@ -10,6 +10,8 @@ use tauri::{Emitter, Manager};
 mod file_io;
 use file_io::{mtime_ms, read_text_file, write_text_file};
 
+mod cli_link;
+
 const MAX_WIKI_RESPONSE: u64 = 5 * 1024 * 1024;
 
 fn navigation_allowed(scheme: &str, host: Option<&str>, debug: bool) -> bool {
@@ -292,6 +294,120 @@ mod wiki_tests {
 
 // Analiza tanto aperturas iniciales como argumentos reenviados por la segunda
 // instancia. macOS además entrega asociaciones mediante RunEvent::Opened.
+// ---------- El comando `luca` en la terminal ----------
+// Sólo tiene sentido donde el instalador no deja el comando: el .dmg de macOS
+// y el AppImage de Linux. En Windows lo resuelve el .msi con el PATH.
+
+#[cfg(unix)]
+fn writable_dir(dir: &std::path::Path) -> bool {
+    if !dir.is_dir() {
+        return false;
+    }
+    // Los bits de permiso mienten: hay ACL, montajes de sólo lectura y dueños
+    // distintos. La prueba honesta de «puedo escribir aquí» es escribir, así
+    // que se crea un archivo con nuestro pid y se retira en el acto.
+    let probe = dir.join(format!(".luca-write-probe-{}", std::process::id()));
+    match std::fs::File::create(&probe) {
+        Ok(_) => {
+            let _ = std::fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+#[cfg(unix)]
+fn resolve_entry(path: &std::path::Path) -> Option<std::path::PathBuf> {
+    // symlink_metadata para no seguir el enlace: queremos saber si existe la
+    // entrada, y read_link para ver a dónde apunta sin resolver más allá.
+    std::fs::symlink_metadata(path).ok()?;
+    Some(std::fs::read_link(path).unwrap_or_else(|_| path.to_path_buf()))
+}
+
+#[cfg(unix)]
+fn cli_candidates() -> Vec<std::path::PathBuf> {
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    cli_link::candidate_dirs(&path_var, &writable_dir)
+}
+
+#[derive(serde::Serialize)]
+struct CliLinkReport {
+    #[serde(flatten)]
+    state: cli_link::LinkState,
+    candidates: Vec<String>,
+}
+
+#[tauri::command]
+fn cli_link_status() -> Result<CliLinkReport, String> {
+    #[cfg(unix)]
+    {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let candidates = cli_candidates();
+        Ok(CliLinkReport {
+            state: cli_link::link_state(&exe, &candidates, &resolve_entry),
+            candidates: candidates
+                .iter()
+                .map(|dir| dir.display().to_string())
+                .collect(),
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        // El .msi ya añade su carpeta al PATH; no hay nada que ofrecer.
+        Ok(CliLinkReport {
+            state: cli_link::LinkState::NoCandidates,
+            candidates: Vec::new(),
+        })
+    }
+}
+
+#[cfg(unix)]
+#[tauri::command]
+fn install_cli_link(dir: String) -> Result<String, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = std::path::PathBuf::from(&dir);
+    // Sólo una carpeta que el propio sistema ya haya ofrecido: así la petición
+    // del frontend no puede escribir en cualquier sitio del disco.
+    if !cli_candidates().contains(&dir) {
+        return Err("err.cli.not_candidate".into());
+    }
+    let target = dir.join("luca");
+    match cli_link::entry_state(&dir, &exe, &resolve_entry) {
+        cli_link::LinkState::Linked(path) => return Ok(path),
+        cli_link::LinkState::Occupied(_) => return Err("err.cli.occupied".into()),
+        _ => {}
+    }
+    std::os::unix::fs::symlink(&exe, &target).map_err(|e| format!("err.cli.failed|{e}"))?;
+    Ok(target.display().to_string())
+}
+
+// Sin argumentos a propósito: quien sabe dónde está el enlace es el mismo
+// código que lo reporta, no el frontend. Y se retira únicamente si apunta a
+// este ejecutable.
+#[cfg(unix)]
+#[tauri::command]
+fn remove_cli_link() -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    match cli_link::link_state(&exe, &cli_candidates(), &resolve_entry) {
+        cli_link::LinkState::Linked(path) => {
+            std::fs::remove_file(&path).map_err(|e| format!("err.cli.failed|{e}"))
+        }
+        _ => Err("err.cli.occupied".into()),
+    }
+}
+
+#[cfg(not(unix))]
+#[tauri::command]
+fn install_cli_link(_dir: String) -> Result<String, String> {
+    Err("err.cli.not_candidate".into())
+}
+
+#[cfg(not(unix))]
+#[tauri::command]
+fn remove_cli_link() -> Result<(), String> {
+    Err("err.cli.not_candidate".into())
+}
+
 mod file_argument;
 
 // Aperturas pendientes en frío: el sistema puede entregar varios archivos
@@ -860,6 +976,9 @@ fn main() {
             take_opened_files,
             set_recent_files,
             set_menu_labels,
+            cli_link_status,
+            install_cli_link,
+            remove_cli_link,
             take_new_document,
             print_with_margins,
             parse_wikitext,

@@ -1546,6 +1546,11 @@ const wikiServerApiInput = document.getElementById("wikiServerApi");
 const wikiStylesInput = document.getElementById("wikiStyles");
 const wikiStyleModulesInput = document.getElementById("wikiStyleModules");
 const languageSel = document.getElementById("uiLanguage");
+const cliStateEl = document.getElementById("cliState");
+const cliDirSel = document.getElementById("cliDir");
+const cliWhereRow = document.getElementById("cliWhereRow");
+const cliInstallBtn = document.getElementById("cliInstall");
+const cliRemoveBtn = document.getElementById("cliRemove");
 const designListEl = document.getElementById("designList");
 const designNameInput = document.getElementById("designName");
 const tokenFormGeneral = document.getElementById("tokenFormGeneral");
@@ -1681,6 +1686,53 @@ function buildTokenForms() {
 
 }
 
+// ---------- El comando `luca` en la terminal ----------
+// Rust dice en qué estado está y en qué carpetas del PATH puede escribir; aquí
+// sólo se decide qué se muestra. Un `luca` que no sea nuestro no se toca.
+async function refreshCliState() {
+  if (!cliStateEl) return;
+  let report = null;
+  if (TAURI) {
+    try { report = await TAURI.core.invoke("cli_link_status"); } catch {}
+  }
+  const state = report?.state ?? "no_candidates";
+  const path = report?.path ?? "";
+  const dirs = report?.candidates ?? [];
+
+  cliStateEl.innerHTML = t(`prefs.cli.${state === "no_candidates" ? "none" : state}`, { path });
+  if (cliDirSel) {
+    cliDirSel.replaceChildren(...dirs.map((dir) => {
+      const option = document.createElement("option");
+      option.value = dir;
+      option.textContent = dir;
+      return option;
+    }));
+  }
+  // Ofrecer instalar sólo cuando hay sitio y no hay nada; quitar sólo lo nuestro.
+  const puedeInstalar = state === "missing" && dirs.length > 0;
+  if (cliWhereRow) cliWhereRow.hidden = !puedeInstalar;
+  if (cliInstallBtn) cliInstallBtn.hidden = !puedeInstalar;
+  if (cliRemoveBtn) cliRemoveBtn.hidden = state !== "linked";
+}
+
+async function installCliLink() {
+  try {
+    await TAURI.core.invoke("install_cli_link", { dir: cliDirSel?.value });
+  } catch (error) {
+    alert(t(error));
+  }
+  refreshCliState();
+}
+
+async function removeCliLink() {
+  try {
+    await TAURI.core.invoke("remove_cli_link");
+  } catch (error) {
+    alert(t(error));
+  }
+  refreshCliState();
+}
+
 // Menú lateral de categorías: una sección visible a la vez.
 function showPrefsTab(name) {
   for (const btn of document.querySelectorAll(".prefs-tab-btn")) {
@@ -1737,6 +1789,7 @@ function openPrefs(tab) {
   }
   buildTokenForms();
   renderDesignList();
+  refreshCliState();
   if (typeof tab === "string") showPrefsTab(tab);
   utilityDialogTrigger = document.activeElement;
   if (prefsEl) {
@@ -1902,6 +1955,8 @@ if (prefsEl) {
   document.getElementById("designAdd")?.addEventListener("click", () => addDesign(VERA_DEFAULTS, t("prefs.design.new_name")));
   document.getElementById("designDuplicate")?.addEventListener("click", () => addDesign(tokensState, t("prefs.design.copy_suffix", { name: designs.active })));
   document.getElementById("designRemove")?.addEventListener("click", removeDesign);
+  cliInstallBtn?.addEventListener("click", installCliLink);
+  cliRemoveBtn?.addEventListener("click", removeCliLink);
   designNameInput?.addEventListener("change", () => renameDesign(designNameInput.value));
   mermaidSel?.addEventListener("change", () => {
     try { localStorage.setItem("luca.mermaidTheme", mermaidSel.value); } catch {}
