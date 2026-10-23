@@ -47,7 +47,10 @@
     ],
     "linux": {
       "deb": {
-        "desktopTemplate": "luca.desktop"
+        "desktopTemplate": "luca.desktop",
+        "files": {
+          "/usr/share/metainfo/net.mediafranca.luca.metainfo.xml": "../flatpak/net.mediafranca.luca.metainfo.xml"
+        }
       }
     },
     "fileAssociations": [

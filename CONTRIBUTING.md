@@ -80,3 +80,9 @@ asociaciones del sistema.
 
 Al contribuir aceptas que tu aporte se publique bajo la **EUPL 1.2**, la misma
 licencia del proyecto (ver [LICENSE](LICENSE)).
+
+## Distribución
+
+Consulta [Homebrew, Flatpak local y Flathub](docs/distribucion.md) para preparar,
+verificar y actualizar los paquetes. Son canales separados y todavía requieren
+pruebas de instalación en sus plataformas antes de anunciarlos.

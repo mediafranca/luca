@@ -1,0 +1,35 @@
+# Sólo distribución local; no enviar a Flathub. Véase ../docs/distribucion.md.
+id: net.mediafranca.luca
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: luca
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Preview MediaWiki; archivos propios, recientes y detección de cambios externos.
+  - --share=network
+  - --filesystem=home
+modules:
+  - name: luca
+    buildsystem: simple
+    sources:
+      - type: file
+        path: net.mediafranca.luca.metainfo.xml
+      - type: file
+        url: https://github.com/mediafranca/luca/releases/download/v0.7.3/Luca_0.7.3_amd64.deb
+        sha256: 8fcd39bed0c9634c627adde2698ba283f2607c505cfe9b3b2637378b99bc13d9
+        only-arches: [x86_64]
+    build-commands:
+      - mkdir deb-extract
+      - ar -x Luca_0.7.3_amd64.deb --output deb-extract
+      - tar -C deb-extract -xf deb-extract/data.tar.gz
+      - install -Dm755 deb-extract/usr/bin/luca /app/bin/luca
+      - sed -i 's/^Icon=.*/Icon=net.mediafranca.luca/' deb-extract/usr/share/applications/Luca.desktop
+      - install -Dm644 deb-extract/usr/share/applications/Luca.desktop /app/share/applications/net.mediafranca.luca.desktop
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/32x32/apps/luca.png /app/share/icons/hicolor/32x32/apps/net.mediafranca.luca.png
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/luca.png /app/share/icons/hicolor/128x128/apps/net.mediafranca.luca.png
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/256x256@2/apps/luca.png /app/share/icons/hicolor/256x256@2/apps/net.mediafranca.luca.png
+      - install -Dm644 net.mediafranca.luca.metainfo.xml /app/share/metainfo/net.mediafranca.luca.metainfo.xml

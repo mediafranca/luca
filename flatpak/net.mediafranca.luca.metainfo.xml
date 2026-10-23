@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.mediafranca.luca</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>EUPL-1.2</project_license>
+  <name>Luca</name>
+  <summary>Desktop Markdown and Wikitext editor</summary>
+  <summary xml:lang="es">Editor Markdown y Wikitext de escritorio</summary>
+  <developer id="net.mediafranca"><name>MediaFranca</name></developer>
+  <description>
+    <p>Write Markdown and Wikitext in local files. Switch between source, split and rendered views, edit tables and preview Mermaid diagrams offline.</p>
+    <p xml:lang="es">Escribe Markdown y Wikitext en archivos locales. Alterna entre código, vista dividida y vista renderizada, edita tablas y previsualiza diagramas Mermaid sin conexión.</p>
+    <p>Preview Wikitext using a public MediaWiki API. Documents are saved without adding metadata or changing their syntax.</p>
+    <p xml:lang="es">Previsualiza Wikitext mediante una API pública de MediaWiki. Los documentos se guardan sin añadir metadatos ni cambiar su sintaxis.</p>
+  </description>
+  <launchable type="desktop-id">net.mediafranca.luca.desktop</launchable>
+  <url type="homepage">https://github.com/mediafranca/luca</url>
+  <url type="bugtracker">https://github.com/mediafranca/luca/issues</url>
+  <url type="vcs-browser">https://github.com/mediafranca/luca</url>
+  <url type="help">https://github.com/mediafranca/luca/blob/main/docs/uso.md</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Editing a document in Luca</caption>
+      <caption xml:lang="es">Edición de un documento en Luca</caption>
+      <image>https://raw.githubusercontent.com/mediafranca/luca/v0.7.3/assets/luca-01.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <supports><control>keyboard</control><control>pointing</control></supports>
+  <releases><release version="0.7.3" date="2026-10-23"/></releases>
+</component>
