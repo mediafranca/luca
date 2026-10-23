@@ -4,3 +4,8 @@ node_modules/
 /.build/
 /.worktrees/
 .DS_Store
+
+# Archivos de intercambio de editores
+*.swp
+*.swo
+*~

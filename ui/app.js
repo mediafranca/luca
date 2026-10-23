@@ -350,6 +350,20 @@ function absolutizeWikiUrls(fragment, api) {
   }
 }
 
+// Las skins eligen su paleta con light-dark(), que resuelve según el
+// color-scheme computado del elemento. La hoja de la wiki lo fija en su :root;
+// un estilo en línea sobre el host gana a esa regla, así que la vista previa
+// sigue el claro/oscuro de Luca sin volver a pedir el parseo ni las CSS.
+// Una skin que sólo use @media (prefers-color-scheme) seguirá al sistema, no a
+// Luca: eso no lo podemos gobernar desde aquí.
+const applyWikiScheme = (host) => {
+  host.style.colorScheme = isCurrentDark() ? "dark" : "light";
+};
+
+const refreshWikiScheme = () => {
+  for (const host of document.querySelectorAll(".wiki-styled")) applyWikiScheme(host);
+};
+
 // Base mínima dentro del shadow root: la hoja de la wiki viene después y manda.
 const WIKI_SHADOW_BASE = `:host { display:block; }
 .wiki-body { background:#fff; color:#202122;
@@ -393,6 +407,7 @@ async function showWikiHtml(doc, cache, renderVersion) {
   const body = document.createElement("div");
   body.className = "wiki-body mw-body-content";
   body.append(template.content);
+  applyWikiScheme(host);
   host.attachShadow({ mode: "open" }).append(style, body);
   doc.previewEl.setAttribute("data-wiki-styles", "");
   doc.previewEl.replaceChildren(host);
@@ -1532,6 +1547,7 @@ ${darkCSS}
     d.ed?.remeasure?.();
   }
   initMermaid();
+  refreshWikiScheme();
   for (const d of docs) renderDoc(d);
   updateThemeSwitchUI();
 }
@@ -1597,6 +1613,7 @@ function buildTokenForms() {
           tokensState.general[meta.name] = input.value;
           saveTokens();
           applyTokens();
+          refreshSamples();
         });
       } else {
         input = document.createElement("input");
@@ -1606,6 +1623,7 @@ function buildTokenForms() {
           tokensState.general[meta.name] = input.value.trim();
           saveTokens();
           applyTokens();
+          refreshSamples();
         });
       }
       row.append(input);
@@ -1614,9 +1632,72 @@ function buildTokenForms() {
   }
 
   // Helper para construir sección de colores
+  // La muestra lleva los tokens puestos en su propia raíz: los generales de la
+  // pestaña Generales —tipografías, cuerpos, interlínea, medidas— y los colores
+  // del tema que se edita. Al no heredar los de la app, enseña el tema oscuro
+  // tal como se verá aunque estés mirando la pantalla en claro.
+  function themeSample(themeKey) {
+    const sample = document.createElement("div");
+    sample.className = "theme-sample";
+    const token = (name) =>
+      tokensState.general[name] ?? tokensState[themeKey][name] ??
+      VERA_DEFAULTS.general[name] ?? VERA_DEFAULTS[themeKey][name];
+    for (const name of [...Object.keys(VERA_DEFAULTS.general), ...Object.keys(VERA_DEFAULTS[themeKey])]) {
+      sample.style.setProperty(name, token(name));
+    }
+
+    const code = document.createElement("div");
+    code.className = "sample-code";
+    const l1 = document.createElement("div");
+    l1.className = "accent";
+    l1.textContent = t("sample.code.comment");
+    const l2 = document.createElement("div");
+    l2.textContent = t("sample.code.text");
+    code.append(l1, l2);
+
+    const read = document.createElement("div");
+    read.className = "sample-read";
+    const h = document.createElement("h4");
+    h.textContent = t("sample.read.heading");
+    const p = document.createElement("p");
+    p.append(document.createTextNode(`${t("sample.read.text")} `));
+    const a = document.createElement("span");
+    a.className = "accent";
+    a.textContent = t("sample.read.link");
+    p.append(a, document.createTextNode("."));
+    const rule = document.createElement("hr");
+    const dim = document.createElement("p");
+    dim.className = "dim";
+    dim.textContent = t("sample.read.dim");
+    // Los colores de la interfaz no tienen dónde verse en un texto: van como
+    // una franja, que es la única manera honesta de mostrarlos.
+    const chrome = document.createElement("div");
+    chrome.className = "chrome";
+    for (const name of ["--bg", "--bg-raised", "--rule", "--text", "--text-dim"]) {
+      const swatch = document.createElement("span");
+      swatch.style.background = `var(${name})`;
+      swatch.title = name;
+      chrome.append(swatch);
+    }
+    read.append(h, p, rule, dim, chrome);
+
+    sample.append(code, read);
+    return sample;
+  }
+
+  // Las muestras de los dos temas llevan los tokens generales, así que cambiar
+  // una tipografía o un cuerpo en Generales también las desactualiza.
+  function refreshSamples() {
+    for (const [container, themeKey] of [[tokenFormLight, "light"], [tokenFormDark, "dark"]]) {
+      const live = container?.querySelector(".theme-sample");
+      if (live) live.replaceWith(themeSample(themeKey));
+    }
+  }
+
   function buildColorSection(container, themeKey) {
     if (!container) return;
     container.replaceChildren();
+    container.append(themeSample(themeKey));
 
     const note = document.createElement("div");
     note.className = "prefs-group";
@@ -1655,6 +1736,9 @@ function buildTokenForms() {
         tokensState[themeKey][meta.name] = newVal;
         saveTokens();
         applyTokens();
+        // Repintar sólo la muestra: reconstruir el formulario entero robaría el
+        // foco del control que se está arrastrando.
+        refreshSamples();
       };
 
       colorInput.addEventListener("input", () => {

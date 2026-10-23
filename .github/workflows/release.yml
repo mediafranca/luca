@@ -64,17 +64,17 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Firma de macOS. Sin secretos, "-" hace una firma ad-hoc: el bundle
-          # pasa a tener _CodeSignature y deja de ser «no usable signature»,
-          # aunque Gatekeeper siga pidiendo permiso por no estar notarizada.
-          # Si algún día se añaden los secretos de Developer ID, este mismo
-          # workflow firma y notariza sin cambiar nada más.
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Firma de macOS. "-" es firma ad-hoc: el bundle pasa a tener
+          # _CodeSignature y deja de ser «no usable signature», aunque
+          # Gatekeeper siga pidiendo permiso por no estar notarizada.
+          #
+          # NO añadir aquí APPLE_CERTIFICATE ni las variables de notarización
+          # como ${{ secrets.X }}: un secreto inexistente no deja la variable
+          # sin definir, la define VACÍA, y Tauri intenta importar un .p12
+          # vacío y la compilación muere. Cuando exista un certificado
+          # Developer ID, hay que definirlas en un paso aparte que escriba en
+          # $GITHUB_ENV sólo si el secreto trae contenido.
+          APPLE_SIGNING_IDENTITY: "-"
         with:
           tagName: v__VERSION__
           releaseName: "Luca v__VERSION__"

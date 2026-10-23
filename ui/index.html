@@ -429,6 +429,27 @@
     border-radius:7px; background:var(--bg); color:var(--text); cursor:pointer; }
   .prefs-row-buttons button:hover { border-color:var(--text-dim); }
 
+  /* Muestra en vivo del tema que se está editando. Lleva TODOS los tokens
+     —tipografías y medidas de Generales, colores de esta pestaña— puestos como
+     custom properties en su raíz, así que no hereda los de la app y enseña el
+     tema que se edita aunque la pantalla esté en el otro. */
+  .theme-sample { display:grid; grid-template-columns:1fr 1fr; gap:1px; margin:2px 0 14px;
+    border:1px solid var(--rule); border-radius:8px; overflow:hidden;
+    background:var(--rule); min-height:8.5rem; }
+  .theme-sample > div { padding:12px 14px; overflow:hidden; }
+  .sample-code { background:var(--code-bg); color:var(--code-text);
+    font-family:var(--font-mono); font-size:var(--code-size); line-height:1.5; }
+  .sample-read { background:var(--preview-bg); color:var(--preview-text);
+    font-family:var(--font-read); font-size:var(--text-size); line-height:var(--line-height); }
+  .theme-sample .accent { color:var(--accent); }
+  .theme-sample .dim { color:var(--text-dim); }
+  .theme-sample h4 { margin:0 0 .4em; font-size:1.25em; font-weight:600; line-height:1.2; }
+  .theme-sample p { margin:0 0 .5em; }
+  .theme-sample hr { border:0; height:1px; background:var(--preview-text); opacity:.35; margin:.7em 0; }
+  .theme-sample .chrome { display:flex; gap:0; margin-top:.6em; border-radius:4px; overflow:hidden; }
+  .theme-sample .chrome span { flex:1; height:12px; }
+  @media (max-width:640px) { .theme-sample { grid-template-columns:1fr; } }
+
   .token-color { display:inline-flex; align-items:center; gap:8px; flex:0 0 52%; }
   .token-color input[type=color] {
     width:34px; height:26px; padding:0; border:1px solid var(--rule); border-radius:5px;

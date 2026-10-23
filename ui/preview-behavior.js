@@ -28,8 +28,13 @@ export function isEditablePreviewMode(mode) {
 export function scopeWikiCss(css) {
   return css
     .replace(WIKI_FONT_FACE, "")
-    .replace(/(^|[\s,{}>+~])(?::root|html)\b/g, "$1:host")
-    .replace(/(^|[\s,{}>+~])body\b/g, "$1.wiki-body");
+    // Primero las raíces cualificadas: :host no admite compuestos sueltos, así
+    // que `:root[data-x="y"]` tiene que pasar a `:host([data-x="y"])`. Escrito
+    // como `:host[data-x="y"]` el selector es inválido y el navegador descarta
+    // la regla entera — que es justo donde las skins eligen su esquema.
+    .replace(/(^|[\s,{}>+~(])(?::root|html)((?:\[[^\]]*\]|[.#:][\w-]+)+)/g, "$1:host($2)")
+    .replace(/(^|[\s,{}>+~(])(?::root|html)\b/g, "$1:host")
+    .replace(/(^|[\s,{}>+~(])body\b/g, "$1.wiki-body");
 }
 
 // Un @font-face declarado dentro de un shadow root no se registra, así que el
