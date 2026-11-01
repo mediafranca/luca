@@ -225,6 +225,15 @@ rule CerrarDocumento {
     @guarantee ActivaUnVecinoAlCerrar
         -- Si se cierra el documento activo, queda activo uno de los restantes;
         -- siempre hay exactamente un documento activo (UnSoloActivo).
+
+    @guarantee CerrarLaUltimaCierraLaVentana
+        -- Cerrar la última pestaña cierra la ventana; la principal sólo se
+        -- oculta, con la pestaña vacía detrás. En macOS la app sigue en la
+        -- barra de menú y vuelve con el Dock, el menú o una apertura; en los
+        -- demás sistemas, sin otra ventana visible, la app termina. Abrir un
+        -- archivo reemplaza esa pestaña vacía si es la única. En macOS el
+        -- botón de cierre de la principal equivale a cerrar todas sus
+        -- pestañas, con la confirmación de cada una.
 }
 
 ------------------------------------------------------------

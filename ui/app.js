@@ -200,6 +200,10 @@ const newDocumentFormat = () => {
 const WIKI_SERVERS_KEY = "luca.wikiServers";
 const WIKI_API_KEY = "luca.wikiApi";
 const WIKI_STYLES_KEY = "luca.wikiStyles";
+const RESTORE_SESSION_KEY = "luca.restoreSession";
+const restoreSessionOn = () => {
+  try { return localStorage.getItem(RESTORE_SESSION_KEY) !== "off"; } catch { return true; }
+};
 const WIKI_STYLE_MODULES_KEY = "luca.wikiStyleModules";
 const DEFAULT_WIKI_SERVERS = [
   { name: "Casiopea (e[ad] PUCV)", api: "https://wiki.ead.pucv.cl/api.php" },
@@ -371,6 +375,11 @@ const WIKI_SHADOW_BASE = `:host { display:block; }
   line-height:1.6; min-height:100%; box-sizing:border-box;
   padding:1.6em max(1.6em, calc((100% - 52em) / 2)); }
 .wiki-body img { max-width:100%; height:auto; }
+@media print {
+  .wiki-body { padding:0; }
+  .wiki-body table { width:100% !important; max-width:100%; }
+  .wiki-body td, .wiki-body th { white-space:normal !important; overflow-wrap:break-word; }
+}
 `;
 
 // Un pedido de load.php por endpoint y lista de módulos; el fallo se cachea
@@ -708,7 +717,10 @@ async function openPath(path) {
   }
   try {
     const content = await TAURI.core.invoke("read_file", { path });
+    // La pestaña vacía que deja cerrar la última no sobrevive a una apertura.
+    const blank = docs.length === 1 && isDisposableBlank(docs[0]) ? docs[0] : null;
     const doc = makeDoc(content, path);
+    if (blank) await closeDoc(blank, { force: true, replacement: false });
     doc.lastMtime = await TAURI.core.invoke("stat", { path });
     rememberRecent(path);
     return doc;
@@ -776,7 +788,9 @@ async function closeDoc(doc, { force = false, release = true, replacement = true
   doc.previewEl.remove();
   docs.splice(i, 1);
   if (release && doc.path && TAURI) TAURI.core.invoke("release_document", { path: doc.path, windowLabel }).catch(() => {});
-  if (docs.length === 0) { if (replacement) newDoc(); return true; }
+  // Cerrar la última pestaña cierra la ventana; queda una vacía por si «main»
+  // vuelve a mostrarse.
+  if (docs.length === 0) { if (replacement) { newDoc(); closeEmptiedWindow(); } return true; }
   if (active === doc) activate(docs[Math.min(i, docs.length - 1)]);
   else renderTabs();
   saveSessionSoon();
@@ -788,7 +802,13 @@ async function moveTabToWindow(doc, target = null) {
   const targetLabel = target || await TAURI.core.invoke("create_editor_window");
   await TAURI.core.invoke("transfer_tab", { target: targetLabel, payload: transferableTab(doc, document.body.dataset.mode) });
   await closeDoc(doc, { force: true, release: false, replacement: false });
-  if (docs.length === 0) await TAURI.window.getCurrentWindow().close();
+  if (docs.length === 0) { newDoc(); closeEmptiedWindow(); }
+}
+
+function closeEmptiedWindow() {
+  if (!TAURI) return;
+  saveSessionNow();
+  TAURI.core.invoke("close_emptied_window").catch(() => {});
 }
 
 async function receiveTransferredTabs() {
@@ -838,13 +858,20 @@ addEventListener(
 if (TAURI) {
   TAURI.event.listen("open-file", (e) => openPath(e.payload)); // apertura en caliente: añade pestaña
   TAURI.event.listen("launch-request", () => drainLaunchRequest());
-  TAURI.event.listen("menu", (e) => {
+  TAURI.event.listen("menu", async (e) => {
     const id = e.payload, a = active;
+    // Con «main» oculta, el menú le llega igual: la muestra antes de actuar.
+    // Su pestaña vacía ya sirve de documento nuevo.
+    if (id !== "close_tab" && id !== "close_window" && id !== "recent_clear" && !(await TAURI.window.getCurrentWindow().isVisible())) {
+      await TAURI.core.invoke("focus_window", { label: windowLabel });
+      if (id === "new" && docs.length === 1 && isDisposableBlank(docs[0])) return;
+    }
     if (id === "new") newDoc();
     else if (id === "open") openFile();
     else if (id === "save") { if (a) saveDoc(a, false); }
     else if (id === "save_as") { if (a) saveDoc(a, true); }
     else if (id === "close_tab") { if (a) closeDoc(a); }
+    else if (id === "close_window") { for (const d of [...docs]) if (!(await closeDoc(d))) break; }
     else if (id === "export_pdf") exportPdf();
     else if (id === "prefs_mermaid") openPrefs();
     else if (id === "mode_source") applyMode("source");
@@ -1560,6 +1587,7 @@ const wikiTitleInput = document.getElementById("wikiTitle");
 const wikiServerNameInput = document.getElementById("wikiServerName");
 const wikiServerApiInput = document.getElementById("wikiServerApi");
 const wikiStylesInput = document.getElementById("wikiStyles");
+const restoreSessionInput = document.getElementById("restoreSession");
 const wikiStyleModulesInput = document.getElementById("wikiStyleModules");
 const languageSel = document.getElementById("uiLanguage");
 const cliStateEl = document.getElementById("cliState");
@@ -1868,6 +1896,7 @@ function openPrefs(tab) {
     try { wikiTitleInput.value = localStorage.getItem("luca.wikiTitle") || ""; } catch {}
   }
   if (wikiStylesInput) wikiStylesInput.checked = wikiStylesOn();
+  if (restoreSessionInput) restoreSessionInput.checked = restoreSessionOn();
   if (wikiStyleModulesInput) {
     try { wikiStyleModulesInput.value = localStorage.getItem(WIKI_STYLE_MODULES_KEY) || ""; } catch {}
   }
@@ -2067,6 +2096,9 @@ if (prefsEl) {
     } catch {}
     rerenderWikitext();
   });
+  restoreSessionInput?.addEventListener("change", () => {
+    try { localStorage.setItem(RESTORE_SESSION_KEY, restoreSessionInput.checked ? "on" : "off"); } catch {}
+  });
   wikiStylesInput?.addEventListener("change", () => {
     try { localStorage.setItem(WIKI_STYLES_KEY, wikiStylesInput.checked ? "on" : "off"); } catch {}
     rerenderWikitext();
@@ -2259,6 +2291,7 @@ async function drainLaunchRequest() {
 }
 
 async function restorePreviousSession() {
+  if (!restoreSessionOn()) return false;
   const snapshot = readJsonStorage(sessionStorageKey, null);
   if (!validSession(snapshot) || snapshot.documents.length === 0) return false;
   restoringSession = true;
@@ -2299,7 +2332,9 @@ addEventListener("beforeunload", (event) => {
 
 renderRecentFiles();
 if (windowLabel === "main") {
-  if (!(await drainLaunchRequest()) && !(await restorePreviousSession())) makeDoc(SAMPLE, null);
+  if (!(await drainLaunchRequest()) && !(await restorePreviousSession())) {
+    if (restoreSessionOn()) makeDoc(SAMPLE, null); else newDoc();
+  }
 } else {
   await receiveTransferredTabs();
   if (!docs.length) newDoc();

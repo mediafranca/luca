@@ -82,7 +82,9 @@ surface Editor {
     @guarantee RestauracionDeSesion
         -- Al volver a abrir luca se restaura el orden de pestañas, la activa y
         -- los borradores recuperables. La recuperación nunca sustituye el
-        -- archivo original ni lo marca guardado.
+        -- archivo original ni lo marca guardado. Una preferencia (activa por
+        -- omisión) permite no restaurar: la sesión se sigue guardando, pero
+        -- luca arranca con un documento vacío.
 
     @guarantee ArchivosRecientes
         -- Las rutas abiertas o guardadas recientemente son consultables desde
@@ -151,6 +153,9 @@ surface VistaPrevia {
         -- sea cual sea el tema de la pantalla: los colores de un diagrama
         -- Mermaid se fijan al renderizarlo y en oscuro no se leerían sobre el
         -- papel. Al cerrar el diálogo la pantalla recupera su tema.
+        -- En papel todo se imprime al 75 % del tamaño de pantalla y las
+        -- tablas ocupan el ancho de la página sin truncarse, también con las
+        -- CSS de la wiki.
 
     @guarantee SigueAlCursor
         -- En la vista dividida, la vista previa se desplaza al bloque donde

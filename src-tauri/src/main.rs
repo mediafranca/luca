@@ -434,6 +434,8 @@ fn create_editor_window(
     tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("index.html".into()))
         .title("Luca")
         .inner_size(960.0, 620.0)
+        // Sin esto Tauri acapara todo arrastre y las pestañas no se reordenan.
+        .disable_drag_drop_handler()
         .build()
         .map_err(|e| e.to_string())?;
     Ok(label)
@@ -530,6 +532,29 @@ fn gather_windows(app: tauri::AppHandle, target: String) -> Result<(), String> {
         let _ = app.emit_to(label, "gather-tabs", target.clone());
     }
     focus_window(app, target)
+}
+
+// Cerrar la última pestaña vacía la ventana. «main» sólo se oculta: recibe
+// las aperturas del sistema y el menú. Fuera de macOS, sin otra ventana
+// visible, la app termina.
+#[tauri::command]
+fn close_emptied_window(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if !cfg!(target_os = "macos") && !any_other_visible(&app, window.label()) {
+        app.exit(0);
+        return Ok(());
+    }
+    if window.label() == "main" {
+        window.hide()
+    } else {
+        window.close()
+    }
+    .map_err(|e| e.to_string())
+}
+
+fn any_other_visible(app: &tauri::AppHandle, label: &str) -> bool {
+    app.webview_windows()
+        .values()
+        .any(|w| w.label() != label && w.is_visible().unwrap_or(false))
 }
 
 #[tauri::command]
@@ -981,6 +1006,7 @@ fn main() {
             remove_cli_link,
             take_new_document,
             print_with_margins,
+            close_emptied_window,
             parse_wikitext,
             fetch_wiki_styles,
             create_editor_window,
@@ -993,14 +1019,41 @@ fn main() {
             window_at_point
         ])
         .setup(move |app| {
-            *app.state::<Pending>().files.lock().unwrap() = startup_request.files.clone();
+            // macOS entrega el doble clic del Finder (RunEvent::Opened) antes de
+            // Ready: añadir, no sustituir, o ese archivo se pierde.
             app.state::<Pending>()
-                .new_document
-                .store(startup_request.new_document, Ordering::SeqCst);
+                .files
+                .lock()
+                .unwrap()
+                .extend(startup_request.files.clone());
+            if startup_request.new_document {
+                app.state::<Pending>()
+                    .new_document
+                    .store(true, Ordering::SeqCst);
+            }
             app.manage(RecentMenu(Mutex::new(None)));
             app.manage(MenuLabels(Mutex::new(MenuLabelMap::new())));
             build_menu(app.handle(), &MenuLabelMap::new())?;
             Ok(())
+        })
+        // Con «main» oculta, cerrar a mano la última ventana visible no debe
+        // dejar la app viva e invisible fuera de macOS.
+        .on_window_event(|window, event| {
+            // En macOS el botón rojo de «main» no la destruye: cierra sus
+            // pestañas (con confirmación) y la oculta; la app sigue con menú.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if cfg!(target_os = "macos") && window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.emit("menu", "close_window");
+                }
+                return;
+            }
+            if !cfg!(target_os = "macos")
+                && matches!(event, tauri::WindowEvent::Destroyed)
+                && !any_other_visible(window.app_handle(), window.label())
+            {
+                window.app_handle().exit(0);
+            }
         })
         .on_menu_event(|app, event| {
             let focused = app
@@ -1018,6 +1071,18 @@ fn main() {
             // macOS entrega los archivos de "Abrir con…" como RunEvent::Opened.
             #[cfg(target_os = "macos")]
             {
+                // Clic en el Dock sin ventanas visibles: vuelve «main».
+                if let tauri::RunEvent::Reopen {
+                    has_visible_windows: false,
+                    ..
+                } = event
+                {
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
+                    return;
+                }
                 if let tauri::RunEvent::Opened { urls } = event {
                     let paths = urls
                         .iter()

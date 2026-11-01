@@ -234,6 +234,8 @@ const es = {
   "prefs.wiki.api.placeholder": "https://es.wikipedia.org/w/api.php",
   "prefs.wiki.add": "Guardar servidor",
   "prefs.wiki.remove": "Eliminar el activo",
+  "prefs.session.group": "Sesión",
+  "prefs.session.restore": "Restaurar los documentos de la sesión anterior",
   "prefs.wiki.styles.group": "Estilos de la wiki",
   "prefs.wiki.styles": "Previsualizar con las CSS de la wiki",
   "prefs.wiki.styles.note":
@@ -588,6 +590,8 @@ const en = {
   "prefs.wiki.api.placeholder": "https://en.wikipedia.org/w/api.php",
   "prefs.wiki.add": "Save server",
   "prefs.wiki.remove": "Delete the active one",
+  "prefs.session.group": "Session",
+  "prefs.session.restore": "Restore the previous session's documents",
   "prefs.wiki.styles.group": "Wiki styles",
   "prefs.wiki.styles": "Preview with the wiki's CSS",
   "prefs.wiki.styles.note":

@@ -239,8 +239,9 @@
   .doc-preview blockquote { border-left:3px solid var(--rule); padding-left:1em; color:var(--text-dim); }
   .doc-preview table { border-collapse:collapse; margin:0 auto; max-width:100%; font-size:.8em; }
   .doc-preview .preview-table-wrapper { overflow-x:auto; }
-  /* overflow-wrap deja que las palabras largas se partan: así la tabla cabe en la columna. */
-  .doc-preview td, .doc-preview th { border:1px solid var(--rule); padding:5px 9px; overflow-wrap:anywhere; }
+  /* break-word parte sólo la palabra que no cabe: con anywhere el reparto de anchos
+     contaba cada palabra como partible y apretaba las columnas cortas a una letra. */
+  .doc-preview td, .doc-preview th { border:1px solid var(--rule); padding:5px 9px; overflow-wrap:break-word; }
   .doc-preview hr { border:0; height:1px; background:var(--preview-text); opacity:.35; margin:2.2em 0; }
 
   /* Contenedor y botón de editar tabla en vista previa */
@@ -504,8 +505,15 @@
     #outline { display:none; }
     #previews { display:block !important; overflow:visible; }
     .doc-preview[hidden] { display:none !important; }
-    .doc-preview:not([hidden]) { display:block !important; height:auto; overflow:visible; padding:0;
-      max-width:var(--content-width); margin:0 auto; }
+    /* WebKit imprime 1 px CSS como 1 pt: el cuerpo de 16 px sale a 16 pt. El zoom
+       lleva todo (texto, diagramas, imágenes) al 75 %, es decir, 1 px = 0,75 pt. */
+    /* El padding derecho de 2 px evita que el webview recorte, por redondeo, el
+       borde derecho de lo que ocupa todo el ancho (las tablas). */
+    .doc-preview:not([hidden]) { display:block !important; height:auto; overflow:visible; padding:0 2px 0 0;
+      max-width:none; margin:0; zoom:.75; }
+    /* En papel no hay barra de desplazamiento: la tabla ocupa el ancho y cabe. */
+    .doc-preview .preview-table-wrapper { overflow:visible; }
+    .doc-preview table { width:100%; }
     /* El primer título no suma su margen (1.6em) al margen de la página. */
     .doc-preview > :first-child { margin-top:0; }
     /* Tablas, diagramas, código e imágenes no se parten en el salto de página;
@@ -597,6 +605,12 @@
           </div>
           <p class="prefs-note" data-i18n-html="prefs.language.note">Cambia los rótulos de la interfaz y del
             menú al instante. No toca el contenido de los documentos ni el idioma de la wiki.</p>
+
+          <div class="prefs-group" data-i18n="prefs.session.group">Sesión</div>
+          <div class="prefs-row">
+            <label for="restoreSession" data-i18n="prefs.session.restore">Restaurar los documentos de la sesión anterior</label>
+            <input id="restoreSession" type="checkbox" role="switch">
+          </div>
 
           <div class="prefs-group" data-i18n="prefs.design.group">Diseño</div>
           <p class="prefs-note" data-i18n-html="prefs.design.note">Un diseño guarda las tipografías, las medidas y los colores de los

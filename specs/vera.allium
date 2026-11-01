@@ -46,7 +46,9 @@ surface LanzamientoVera {
         -- Si Luca ya está abierto, una nueva invocación desde Vera, el sistema
         -- o la línea de comandos entrega todos sus archivos a esa instancia,
         -- restaura y enfoca su ventana. Cada archivo se abre o activa como una
-        -- pestaña; no se crea una sucesión accidental de ventanas.
+        -- pestaña; no se crea una sucesión accidental de ventanas. Si la
+        -- apertura es la que arranca luca, se abre el archivo pedido y queda
+        -- activo; nunca se pierde en favor de la sesión anterior.
 
     @guarantee BorradorDurable
         -- El .md es un borrador temporal-durable que Vera crea y administra.
