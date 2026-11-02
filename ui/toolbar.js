@@ -18,6 +18,17 @@ import {
   toggledLine,
 } from "./format-syntax.js";
 import { isWikitextTableClose, isWikitextTableOpen, readWikitextTable } from "./wikitext-table.js";
+import { insertFootnote, insertWikiRef } from "./footnotes.js";
+
+// Nota al pie tras la selección: `[^n]` + definición al final en Markdown,
+// `<ref></ref>` en Wikitext. El cursor queda donde se escribe la aclaración.
+export function addFootnote(doc) {
+  const ed = doc.ed;
+  const at = ed.getSelection().to;
+  const r = normalizeFormat(doc.format) === "wikitext" ? insertWikiRef(at) : insertFootnote(ed.getDoc(), at);
+  ed.replaceRange(r.insert, r.from, r.to);
+  ed.setSelection(r.cursor);
+}
 
 /**
  * Crea y conecta la barra de herramientas para un documento activo. `doc.ed`
@@ -334,10 +345,12 @@ export function createEditorToolbar(doc, onTableEdit) {
 
   const linkBtn = actionButton("link", t("toolbar.link.external"), () => insertLink(false));
   linkBtn.dataset.link = "external";
+  const footnoteBtn = actionButton("footnote", t("toolbar.footnote"), () => addFootnote(doc));
   const tableBtn = actionButton("grid", t("toolbar.table"), handleTableButton, "toolbar-table-btn");
   linksGroup.append(
     linkBtn,
     actionButton("brackets", t("toolbar.link.internal"), () => insertLink(true)),
+    footnoteBtn,
     tableBtn
   );
 
@@ -361,6 +374,7 @@ export function createEditorToolbar(doc, onTableEdit) {
     }
     setTitle(codeBlockBtn, f === "wikitext" ? t("toolbar.code_block.wiki") : t("toolbar.code_block.md"));
     setTitle(linkBtn, f === "wikitext" ? t("toolbar.link.external.wiki") : t("toolbar.link.md"));
+    setTitle(footnoteBtn, f === "wikitext" ? t("toolbar.footnote.wiki") : t("toolbar.footnote"));
     setTitle(tableBtn, `Editor de tabla ${formatLabel(f)} (▦)`);
   };
   bar.refresh(format());

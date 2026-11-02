@@ -101,9 +101,10 @@ npm run vendor
   `node --check scripts/vendor.mjs` comprueban sintaxis, no comportamiento.
 - Rust: `cargo check --manifest-path src-tauri/Cargo.toml` comprueba compilación.
 - Specs: `allium check specs/` cuando esté instalada la CLI de Allium.
-- No hay un script `npm test` ni una suite de tests propia en el árbol revisado.
-  Para lógica nueva, añade una prueba pequeña adecuada al cambio sin montar
-  infraestructura innecesaria.
+- Tests: `npm test` corre `tests/*.test.mjs` (Node) y `scripts/check-packaging.mjs`;
+  `cargo test --manifest-path src-tauri/Cargo.toml` corre los de Rust. Córrelos
+  antes de empezar y antes de entregar. Para lógica nueva, añade una prueba
+  pequeña en `tests/` sin montar infraestructura innecesaria.
 - Comprueba manualmente los flujos afectados en Tauri: nuevo/abrir/reabrir,
   alternar pestañas, guardar/guardar como, cancelar cierre con cambios y detectar
   edición externa. Usa archivos temporales, nunca borradores reales como fixtures.

@@ -142,7 +142,20 @@ Incluye:
 - párrafo y encabezados H1–H6;
 - negrita, cursiva, tachado, subrayado, superíndice, subíndice y código en línea;
 - cita, listas con viñetas o números, tareas y bloque de código;
-- enlace Markdown, enlace interno `[[página]]` y tabla.
+- enlace Markdown, enlace interno `[[página]]`, nota al pie y tabla.
+
+### Notas al pie
+
+**Nota al pie** (`⌘⌥F` / `Ctrl+Alt+F`, también en el menú **Edición** y en la
+paleta) escribe la llamada `[^n]` tras el cursor o la selección, con el siguiente
+número libre, añade `[^n]: ` al final del documento y deja el cursor ahí para
+escribir la aclaración. Deshacer revierte las dos cosas a la vez. En Wikitext
+inserta `<ref></ref>` en el sitio y la wiki la lleva al pie.
+
+En la vista previa la llamada es un superíndice que enlaza a su nota, y cada nota
+tiene un ↩ que vuelve a la llamada. Se numeran por orden de aparición de las
+llamadas; las etiquetas con nombre (`[^fuente]`) también valen. Luca no renumera
+ni mueve las notas del archivo: si borras una, las demás conservan su etiqueta.
 
 Subrayado, superíndice, subíndice y enlaces internos son extensiones legibles que
 no todos los procesadores Markdown interpretan. Luca conserva cualquier sintaxis

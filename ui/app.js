@@ -2,14 +2,15 @@
 
 import { createMarkdownEditor } from "./vendor/codemirror/editor.js";
 import { AUTO, detectLanguage, language, menuLabels, setLanguage, t, translatePage } from "./i18n.js";
-import { createEditorToolbar, editDocumentTableAtIndex } from "./toolbar.js";
+import { addFootnote, createEditorToolbar, editDocumentTableAtIndex } from "./toolbar.js";
+import { footnoteExtension } from "./footnotes.js";
 import { icon } from "./icons.js";
 import { beginBlockEdit, exitBlockEdit } from "./block-edit.js";
 import { externalWebUrl, isEditablePreviewMode, isInternalAnchor, scopeWikiCss } from "./preview-behavior.js";
 import { moveByOffset, reorderById } from "./tab-order.js";
 import { extensionMismatch, interpretedFormat } from "./document-format.js";
 import DOMPurify from "./vendor/dompurify/purify.es.mjs";
-import { recentPaths, sessionSnapshot, validSession } from "./session-state.js";
+import { recentPaths, restoredMtime, sessionSnapshot, validSession } from "./session-state.js";
 import { matchingCommands } from "./command-search.js";
 import { detectedLineEnding, documentHeadings } from "./document-outline.js";
 import { DEFAULT_DESIGN_NAME, DESIGNS_KEY, TOKENS_KEY, diagnosticReport, migrateSettings, uniqueDesignName }
@@ -58,6 +59,7 @@ async function ensurePreviewRuntime(source = "") {
     marked = markedMod.marked;
     mermaid = mermaidMod.default;
     marked.use({
+      extensions: footnotes.extensions,
       renderer: {
         code(code, lang) {
           // Escapar siempre: el texto del fence pasa por DOMPurify y luego se lee
@@ -96,7 +98,10 @@ const mermaidTheme = () => { try { return localStorage.getItem("luca.mermaidThem
 // elegir otro preset desde Preferencias.
 function initMermaid() {
   if (!mermaid) return;
-  const base = { startOnLoad: false, securityLevel: "loose", maxTextSize: 10_000_000, maxEdges: 2000 };
+  // "strict": DOMPurify sanea las etiquetas (siguen valiendo <b>, <br>…) y
+  // las URL. "loose" no saneaba nada y dejaba a `click … call` invocar
+  // funciones globales, __TAURI__ incluido, desde un .md ajeno.
+  const base = { startOnLoad: false, securityLevel: "strict", maxTextSize: 10_000_000, maxEdges: 2000 };
   const choice = mermaidTheme();
   if (choice === "vera") {
     const previewBg = cssVar("--preview-bg") || cssVar("--bg");
@@ -301,8 +306,11 @@ function toAssetUrl(filePath) {
 // Markdown → DOM por bloques: cada elemento de nivel superior lleva data-line
 // con la línea del texto donde empieza su bloque (para sincronizar el scroll y,
 // más adelante, para la edición por bloques).
+const footnotes = footnoteExtension({ backLabel: () => t("preview.footnote_back") });
+
 function renderBlocks(src) {
   const text = src.replace(/\r\n|\r/g, "\n");
+  footnotes.reset(text);
   const nl = (t) => (t.match(/\n/g) || []).length;
   const out = document.createElement("template");
   let pos = 0, line = 1;
@@ -885,6 +893,7 @@ if (TAURI) {
     else if (id === "move_tab_right") { if (a) moveTab(a, 1); }
     else if (id === "about") openAbout();
     else if (id === "select_next_occurrence") { a?.ed.selectNextOccurrence(); }
+    else if (id === "footnote") { if (a) addFootnote(a); }
     else if (id === "command_palette") openCommandPalette();
     else if (id === "shortcuts") openShortcuts();
     else if (id === "new_window") TAURI.core.invoke("create_editor_window");
@@ -1110,6 +1119,7 @@ const commandList = () => [
   { label: t("cmd.find"), shortcut: `${shortcutPrefix}F`, run: () => active?.ed.openSearch() },
   { label: t("cmd.select_all_matches"), shortcut: `${shortcutPrefix}Shift+L`, run: () => active?.ed.selectAllMatches() },
   { label: t("cmd.goto_line"), shortcut: `${shortcutPrefix}Alt+G`, run: () => active?.ed.gotoLine() },
+  { label: t("cmd.footnote"), shortcut: `${shortcutPrefix}Alt+F`, run: () => active && addFootnote(active) },
   { label: t("cmd.mode_source"), shortcut: `${shortcutPrefix}1`, run: () => applyMode("source") },
   { label: t("cmd.mode_split"), shortcut: `${shortcutPrefix}2`, run: () => applyMode("split") },
   { label: t("cmd.mode_rendered"), shortcut: `${shortcutPrefix}3`, run: () => applyMode("rendered") },
@@ -1157,20 +1167,50 @@ function openCommandPalette() {
   commandQuery.focus();
 }
 
+// Los atajos documentados en docs/uso.md, agrupados como el menú nativo, cuyas
+// teclas reproducen (main.rs). Alimenta el diálogo F1 y Preferencias ▸ Ayuda.
+const SHORTCUT_GROUPS = [
+  ["menu.file", [["cmd.new", "Mod+N"], ["cmd.open", "Mod+O"], ["cmd.save", "Mod+S"],
+    ["cmd.save_as", "Mod+Shift+S"], ["cmd.close_tab", "Mod+W"], ["cmd.export_pdf", "Mod+E"], ["cmd.prefs", "Mod+,"]]],
+  ["menu.edit", [["menu.edit.select_next", "Mod+D"], ["cmd.find", "Mod+F"],
+    ["cmd.select_all_matches", "Mod+Shift+L"], ["cmd.goto_line", "Mod+Alt+G"], ["cmd.footnote", "Mod+Alt+F"]]],
+  ["menu.view", [["cmd.mode_source", "Mod+1"], ["cmd.mode_split", "Mod+2"],
+    ["cmd.mode_rendered", "Mod+3"], ["cmd.zen", "Mod+Shift+Z"]]],
+  ["menu.window", [["cmd.new_window", "Mod+Shift+N"], ["cmd.detach", "Mod+Shift+M"],
+    ["menu.window.tab_left", "Alt+Shift+Left"], ["menu.window.tab_right", "Alt+Shift+Right"]]],
+  ["menu.help", [["palette.title", "Mod+Shift+P"], ["shortcuts.title", "F1"]]],
+];
+const isMac = navigator.platform?.includes("Mac");
+const MAC_KEYS = { Mod: "⌘", Shift: "⇧", Alt: "⌥", Left: "←", Right: "→" };
+const keyLabel = (combo) => isMac
+  ? combo.split("+").map((k) => MAC_KEYS[k] ?? k).join("")
+  : combo.replace("Mod", "Ctrl").replace("Left", "←").replace("Right", "→");
+
+function shortcutRows() {
+  return SHORTCUT_GROUPS.flatMap(([group, items]) => {
+    const head = document.createElement("tr");
+    const th = document.createElement("th");
+    th.colSpan = 2;
+    th.scope = "colgroup";
+    th.textContent = t(group);
+    head.append(th);
+    return [head, ...items.map(([label, combo]) => {
+      const row = document.createElement("tr");
+      const name = document.createElement("td");
+      const key = document.createElement("td");
+      const kbd = document.createElement("kbd");
+      name.textContent = t(label);
+      kbd.textContent = keyLabel(combo);
+      key.append(kbd);
+      row.append(name, key);
+      return row;
+    })];
+  });
+}
+
 function openShortcuts() {
   utilityDialogTrigger = document.activeElement;
-  const rows = document.getElementById("shortcutRows");
-  rows.replaceChildren(...commandList().map((command) => {
-    const row = document.createElement("tr");
-    const label = document.createElement("td");
-    const key = document.createElement("td");
-    label.textContent = command.label;
-    const kbd = document.createElement("kbd");
-    kbd.textContent = command.shortcut;
-    key.append(kbd);
-    row.append(label, key);
-    return row;
-  }));
+  document.getElementById("shortcutRows").replaceChildren(...shortcutRows());
   shortcutsEl.hidden = false;
   shortcutsEl.querySelector("h2")?.setAttribute("tabindex", "-1");
   shortcutsEl.querySelector("h2")?.focus();
@@ -1203,7 +1243,14 @@ previewsEl.addEventListener("click", async (e) => {
     }
     return;
   }
-  if (isInternalAnchor(href)) return;
+  // Cada pestaña tiene su vista previa en el DOM: un #ancla se busca sólo en
+  // la del documento activo (notas al pie, ida y vuelta).
+  if (isInternalAnchor(href)) {
+    e.preventDefault();
+    const id = href.trim().slice(1);
+    active?.previewEl.querySelector(`[id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    return;
+  }
 
   const doc = active;
   if (!doc || !isEditablePreviewMode(document.body.dataset.mode)) return;
@@ -1890,6 +1937,7 @@ function setWikiApi(api) {
 }
 
 function openPrefs(tab) {
+  document.getElementById("helpShortcutRows")?.replaceChildren(...shortcutRows());
   if (mermaidSel) mermaidSel.value = mermaidTheme();
   fillWikiServers();
   if (wikiTitleInput) {
@@ -2080,6 +2128,7 @@ if (prefsEl) {
     try { localStorage.setItem(LANG_KEY, languageSel.value); } catch {}
     setLanguage(resolveLanguage(languageSel.value));
     applyLanguage();
+    document.getElementById("helpShortcutRows")?.replaceChildren(...shortcutRows());
     // Los documentos Markdown no llevan rótulos, pero la vista previa Wikitext
     // muestra su estado traducido: se repinta con el idioma nuevo.
     if (active) updateWikiStatus(active);
@@ -2303,7 +2352,7 @@ async function restorePreviousSession() {
       if (typeof content !== "string") continue;
       const doc = makeDoc(content, item.path, item.formatSelection || "auto");
       doc.dirty = Boolean(item.dirty && item.content !== null);
-      if (item.path && TAURI) doc.lastMtime = await TAURI.core.invoke("stat", { path: item.path });
+      if (item.path && TAURI) doc.lastMtime = restoredMtime(item, await TAURI.core.invoke("stat", { path: item.path }));
       if (item.path && TAURI) {
         const owner = await TAURI.core.invoke("claim_document", { path: item.path, windowLabel });
         if (owner) {

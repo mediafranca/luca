@@ -29,6 +29,7 @@ const es = {
   "menu.file.close_tab": "Cerrar pestaña",
   "menu.edit": "Edición",
   "menu.edit.select_next": "Seleccionar siguiente aparición",
+  "menu.edit.footnote": "Insertar nota al pie",
   "menu.view": "Vista",
   "menu.view.source": "Código fuente",
   "menu.view.split": "Vista dividida",
@@ -124,6 +125,8 @@ const es = {
   "cmd.outline": "Esquema de encabezados",
   "cmd.prefs": "Preferencias",
   "cmd.export_pdf": "Exportar PDF",
+  "cmd.footnote": "Insertar nota al pie",
+  "preview.footnote_back": "Volver a la llamada",
 
   // ---- Preferencias: estructura ----
   "prefs.title": "Preferencias",
@@ -134,6 +137,13 @@ const es = {
   "prefs.tab.wiki": "Wikis",
   "prefs.tab.light": "Tema claro",
   "prefs.tab.dark": "Tema oscuro",
+  "prefs.tab.help": "Ayuda",
+  "prefs.help.multi.group": "Selección múltiple",
+  "prefs.help.multi": "Cada pulsación añade la siguiente aparición del texto seleccionado; sin selección, toma la palabra bajo el cursor. Lo que escribas, borres o pegues se aplica a todos los cursores.",
+  "prefs.help.find.group": "Buscar y comandos",
+  "prefs.help.find": "La paleta busca comandos por nombre o por atajo. Todo lo que tiene atajo está también en los menús, la paleta o la barra.",
+  "prefs.help.blocks.group": "Edición por bloques",
+  "prefs.help.blocks": "En las vistas dividida y renderizada, pulsa un bloque para editar su Markdown en el mismo lugar; al salir, el cambio vuelve al documento.",
 
   // ---- Preferencias: idioma ----
   "prefs.language.group": "Idioma",
@@ -295,6 +305,8 @@ const es = {
   "toolbar.link.external.wiki": "Enlace externo ([url texto])",
   "toolbar.link.internal": "Enlace interno ([[página]])",
   "toolbar.table": "Editor de tabla",
+  "toolbar.footnote": "Nota al pie ([^1])",
+  "toolbar.footnote.wiki": "Nota al pie (<ref>…</ref>)",
 
   // ---- Editor de tablas ----
   "table.edit": "Editar visualmente esta tabla",
@@ -386,6 +398,7 @@ const en = {
   "menu.file.close_tab": "Close Tab",
   "menu.edit": "Edit",
   "menu.edit.select_next": "Select Next Occurrence",
+  "menu.edit.footnote": "Insert Footnote",
   "menu.view": "View",
   "menu.view.source": "Source",
   "menu.view.split": "Split View",
@@ -481,6 +494,8 @@ const en = {
   "cmd.outline": "Heading outline",
   "cmd.prefs": "Settings",
   "cmd.export_pdf": "Export PDF",
+  "cmd.footnote": "Insert footnote",
+  "preview.footnote_back": "Back to the reference",
 
   // ---- Settings: structure ----
   "prefs.title": "Settings",
@@ -491,6 +506,13 @@ const en = {
   "prefs.tab.wiki": "Wikis",
   "prefs.tab.light": "Light theme",
   "prefs.tab.dark": "Dark theme",
+  "prefs.tab.help": "Help",
+  "prefs.help.multi.group": "Multiple selection",
+  "prefs.help.multi": "Each press adds the next occurrence of the selected text; with no selection, it takes the word under the cursor. Whatever you type, delete or paste applies to every cursor.",
+  "prefs.help.find.group": "Search and commands",
+  "prefs.help.find": "The palette finds commands by name or by shortcut. Everything with a shortcut is also in the menus, the palette or the toolbar.",
+  "prefs.help.blocks.group": "Block editing",
+  "prefs.help.blocks": "In split and rendered views, click a block to edit its Markdown in place; when you leave, the change goes back into the document.",
 
   // ---- Settings: language ----
   "prefs.language.group": "Language",
@@ -651,6 +673,8 @@ const en = {
   "toolbar.link.external.wiki": "External link ([url text])",
   "toolbar.link.internal": "Internal link ([[page]])",
   "toolbar.table": "Table editor",
+  "toolbar.footnote": "Footnote ([^1])",
+  "toolbar.footnote.wiki": "Footnote (<ref>…</ref>)",
 
   // ---- Table editor ----
   "table.edit": "Edit this table visually",

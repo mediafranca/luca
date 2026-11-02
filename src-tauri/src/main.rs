@@ -856,6 +856,11 @@ fn build_menu(app: &tauri::AppHandle, labels: &MenuLabelMap) -> tauri::Result<()
             &lbl("edit.select_next", "Seleccionar siguiente aparición"),
             Some("CmdOrCtrl+D"),
         )?)
+        .item(&item(
+            "footnote",
+            &lbl("edit.footnote", "Insertar nota al pie"),
+            Some("CmdOrCtrl+Alt+F"),
+        )?)
         .separator()
         .cut()
         .copy()

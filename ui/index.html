@@ -222,6 +222,13 @@
     line-height:1.18; font-weight:600; letter-spacing:-.01em; margin:1.6em 0 .5em; color:var(--preview-text); }
   .doc-preview p, .doc-preview ul, .doc-preview ol, .doc-preview blockquote { margin:0 0 .9em; color:var(--preview-text); }
   .doc-preview a { color:var(--accent); text-underline-offset:2px; }
+  .doc-preview .footnote-ref { line-height:0; }
+  .doc-preview .footnote-ref a { text-decoration:none; padding:0 .1em; }
+  .doc-preview .footnote { display:flex; gap:.5em; font-size:.88em; line-height:1.5; margin:.35em 0; }
+  .doc-preview .footnote-num { flex:0 0 auto; min-width:1.4em; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+  .doc-preview .footnote-back { text-decoration:none; }
+  /* La primera nota de una serie abre el pie con un filete. */
+  .doc-preview :not(.footnote) + .footnote { margin-top:2.2em; padding-top:1em; border-top:1px solid var(--rule); }
   .doc-preview code { font-family:var(--font-mono); font-size:.9em; }
   .doc-preview pre:not(.mermaid) { font-family:var(--font-mono); background:var(--code-bg, var(--bg-raised));
     color:var(--code-text, var(--text)); padding:14px 16px; border-radius:8px; overflow-x:auto; }
@@ -494,6 +501,9 @@
   .shortcut-list { width:100%; border-collapse:collapse; font-size:13px; }
   .shortcut-list td { padding:5px 4px; border-bottom:1px solid var(--rule); }
   .shortcut-list td:last-child { text-align:right; }
+  .shortcut-list th { padding:14px 4px 4px; text-align:left; font-size:11px; font-weight:600;
+    letter-spacing:.06em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--rule); }
+  .shortcut-list tr:first-child th { padding-top:4px; }
 
   /* ---- Impresión / Exportar PDF: sólo la vista previa del documento activo ---- */
   /* Márgenes de página explícitos: el diálogo de impresión del webview parte de cero. */
@@ -590,6 +600,7 @@
         <button type="button" class="prefs-tab-btn" data-tab="wiki" data-i18n="prefs.tab.wiki">Wikis</button>
         <button type="button" class="prefs-tab-btn" data-tab="light" data-i18n="prefs.tab.light">Tema claro</button>
         <button type="button" class="prefs-tab-btn" data-tab="dark" data-i18n="prefs.tab.dark">Tema oscuro</button>
+        <button type="button" class="prefs-tab-btn" data-tab="help" data-i18n="prefs.tab.help">Ayuda</button>
       </nav>
 
       <div class="prefs-content">
@@ -667,6 +678,17 @@
           <div class="prefs-row prefs-row-buttons">
             <button type="button" id="prefsDiagnostic" data-i18n="prefs.support.diagnostic">Informe técnico para reportar un error…</button>
           </div>
+        </div>
+
+        <div id="prefTabHelp" class="prefs-tab-content" data-tab-panel="help" hidden>
+          <div class="prefs-group" data-i18n="shortcuts.title">Atajos de teclado</div>
+          <table class="shortcut-list"><tbody id="helpShortcutRows"></tbody></table>
+          <div class="prefs-group" data-i18n="prefs.help.multi.group">Selección múltiple</div>
+          <p class="prefs-note" data-i18n-html="prefs.help.multi">Cada pulsación añade la siguiente aparición del texto seleccionado; sin selección, toma la palabra bajo el cursor. Lo que escribas, borres o pegues se aplica a todos los cursores.</p>
+          <div class="prefs-group" data-i18n="prefs.help.find.group">Buscar y comandos</div>
+          <p class="prefs-note" data-i18n-html="prefs.help.find">La paleta busca comandos por nombre o por atajo. Todo lo que tiene atajo está también en los menús, la paleta o la barra.</p>
+          <div class="prefs-group" data-i18n="prefs.help.blocks.group">Edición por bloques</div>
+          <p class="prefs-note" data-i18n-html="prefs.help.blocks">En las vistas dividida y renderizada, pulsa un bloque para editar su Markdown en el mismo lugar; al salir, el cambio vuelve al documento.</p>
         </div>
 
         <div id="prefTabWiki" class="prefs-tab-content" data-tab-panel="wiki" hidden>

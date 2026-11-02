@@ -144,6 +144,20 @@ surface VistaPrevia {
         -- documento guarda siempre el texto fuente; luca no exporta ni
         -- sustituye el diagrama por SVG.
 
+    @guarantee NotasAlPie
+        -- `texto[^n]` con su `[^n]: aclaración` se muestra como un superíndice
+        -- numerado por orden de llamada que enlaza a la nota, y la nota vuelve
+        -- a la llamada. La numeración es sólo visual: luca nunca renumera,
+        -- mueve ni reescribe las etiquetas del archivo. Una llamada sin
+        -- definición queda como texto. Insertar una nota pone la llamada tras
+        -- la selección y la definición al final del documento (en Wikitext,
+        -- un <ref> en el sitio), en un solo paso que deshacer revierte entero.
+
+    @guarantee DiagramaSinCodigo
+        -- Un diagrama no ejecuta código: las etiquetas HTML y las URL se
+        -- sanean y no hay callbacks de clic. Los enlaces saneados siguen
+        -- funcionando. Abrir un .md ajeno no da acceso al IPC de la app.
+
     @guarantee MedidaParaTodo
         -- La medida (ancho de columna) rige todo el contenido renderizado:
         -- encabezados, tablas, diagramas Mermaid, código e imágenes.

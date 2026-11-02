@@ -15,8 +15,18 @@ export function sessionSnapshot(documents, activeId) {
       dirty: Boolean(doc.dirty),
       content: (!doc.path || doc.dirty) && doc.content.length <= MAX_RECOVERY_CHARS ? doc.content : null,
       formatSelection: doc.formatSelection,
+      lastMtime: doc.path ? doc.lastMtime ?? null : null,
     })),
   };
+}
+
+// Un borrador restaurado debe compararse con el disco tal como estaba cuando
+// se leyó, no al restaurar: si no, una edición externa hecha con Luca cerrada
+// se pisaría sin aviso al guardar. Una sesión antigua sin mtime fuerza el aviso
+// (0 nunca coincide). Un documento limpio se relee del disco: vale el actual.
+export function restoredMtime(item, current) {
+  if (!item.dirty || item.content === null) return current;
+  return typeof item.lastMtime === "number" ? item.lastMtime : 0;
 }
 
 export function validSession(value) {

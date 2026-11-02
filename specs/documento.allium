@@ -177,7 +177,9 @@ rule GuardarDocumento {
     @guarantee NoPisaCambiosExternos
         -- Si el archivo cambió fuera de luca desde la última lectura
         -- (mtime distinto al observado, p.ej. porque Vera lo tocó), se pide
-        -- confirmación antes de sobrescribir.
+        -- confirmación antes de sobrescribir. Un borrador restaurado de la
+        -- sesión conserva el mtime con que se leyó el archivo, no el del
+        -- momento de restaurar; si no se conoce, se pide confirmación igual.
 }
 
 rule GuardarComo {
