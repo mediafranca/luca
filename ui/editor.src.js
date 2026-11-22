@@ -79,7 +79,7 @@ const themeFor = (dark, block) =>
   block ? [blockTheme, syntaxHighlighting(blockHighlight)] : [editorTheme(dark), syntaxHighlighting(highlight)];
 
 const languageFor = (format) =>
-  format === "wikitext" ? mediawikiLanguage(mediawikiConfig) : markdown({ base: markdownLanguage });
+  format === "wikitext" ? mediawikiLanguage(mediawikiConfig) : format === "text" ? [] : markdown({ base: markdownLanguage });
 
 export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, block = false, format = "markdown", lineSeparator = "\n", stateJson = null }) {
   const themeComp = new Compartment();

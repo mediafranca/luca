@@ -18,8 +18,8 @@ use "./luca.allium" as luca
 -- Formatos
 ------------------------------------------------------------
 
-enum FormatoDocumento { markdown | wikitext }
-enum SeleccionFormato { automatico | markdown | wikitext }
+enum FormatoDocumento { markdown | wikitext | texto }
+enum SeleccionFormato { automatico | markdown | wikitext | texto }
 
 ------------------------------------------------------------
 -- Documento y Espacio
@@ -152,6 +152,7 @@ rule CambiarFormato {
     @guarantee ComandosSiguenAlFormato
         -- La barra de herramientas y el editor de tablas emiten el marcado del
         -- formato interpretado (Markdown o Wikitext) y no se ocultan al cambiar.
+        -- En texto plano no hay marcado que emitir y la barra se oculta.
         -- Una acción sin equivalente en el formato (lista de tareas en
         -- Wikitext) no está disponible en vez de insertar sintaxis ajena.
 }

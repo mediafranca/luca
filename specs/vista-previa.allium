@@ -75,7 +75,8 @@ surface Editor {
 
     @guarantee FormatoPorDocumento
         -- Pestañas Markdown y Wikitext pueden coexistir. Automático infiere
-        -- .md/.markdown como Markdown y .wiki/.wikitext como Wikitext; una
+        -- .md/.markdown como Markdown, .wiki/.wikitext como Wikitext y .txt
+        -- como texto plano, cuya vista previa es el texto tal cual; una
         -- selección explícita se conserva aunque la extensión discrepe y la
         -- interfaz avisa sin impedir guardar.
 

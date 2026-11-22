@@ -243,6 +243,7 @@
      La medida la pone entonces la propia wiki, así que el panel suelta su padding. */
   .doc-preview[data-wiki-styles] { padding:0; }
   .wiki-styled { display:block; min-height:100%; }
+  .plain-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-mono); background:none; }
   .doc-preview blockquote { border-left:3px solid var(--rule); padding-left:1em; color:var(--text-dim); }
   .doc-preview table { border-collapse:collapse; margin:0 auto; max-width:100%; font-size:.8em; }
   .doc-preview .preview-table-wrapper { overflow-x:auto; }
@@ -573,6 +574,7 @@
       <option value="auto" data-i18n="status.format.auto">Automático por extensión</option>
       <option value="markdown" data-i18n="status.format.markdown">Markdown</option>
       <option value="wikitext" data-i18n="status.format.wikitext">Wikitext</option>
+      <option value="text" data-i18n="status.format.text">Texto plano</option>
     </select>
   </footer>
   <div id="commandPalette" class="utility-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="commandTitle">

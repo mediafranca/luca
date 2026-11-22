@@ -5,7 +5,7 @@ export const TOKENS_KEY = "luca.tokens";
 export const DEFAULT_DESIGN_NAME = "Vera";
 
 const knownSchemes = new Set(["system", "light", "dark"]);
-const knownFormats = new Set(["markdown", "wikitext"]);
+const knownFormats = new Set(["markdown", "wikitext", "text"]);
 
 export function migrateSettings(storage) {
   const previous = Number.parseInt(storage.getItem(SETTINGS_SCHEMA_KEY) || "0", 10) || 0;

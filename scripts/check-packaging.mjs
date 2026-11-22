@@ -25,6 +25,7 @@ assert.equal(bundle.fileAssociations[0].mimeType, "text/markdown");
 assert.deepEqual(bundle.fileAssociations[0].ext, ["md", "markdown"]);
 assert.equal(bundle.fileAssociations[1].mimeType, "text/x-wiki");
 assert.deepEqual(bundle.fileAssociations[1].ext, ["wiki", "wikitext"]);
+assert.deepEqual(bundle.fileAssociations[2].ext, ["txt"]);
 assert.ok(existsSync(join(root, "node_modules", "dompurify", "dist", "purify.es.mjs")));
 assert.doesNotMatch(config.app.security.csp, /cdn\.jsdelivr\.net/);
 // CodeMirror y Mermaid inyectan <style> en tiempo de ejecución. Si Tauri añade

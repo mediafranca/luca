@@ -85,6 +85,7 @@ const es = {
   "status.format.auto": "Automático por extensión",
   "status.format.markdown": "Markdown",
   "status.format.wikitext": "Wikitext",
+  "status.format.text": "Texto plano",
   "status.format.warning": "La extensión no coincide con el formato",
   "status.format.warning.detail":
     "El formato elegido no coincide con la extensión; se guardará sin convertir.",
@@ -454,6 +455,7 @@ const en = {
   "status.format.auto": "Automatic by extension",
   "status.format.markdown": "Markdown",
   "status.format.wikitext": "Wikitext",
+  "status.format.text": "Plain text",
   "status.format.warning": "The extension does not match the format",
   "status.format.warning.detail":
     "The chosen format does not match the extension; it will be saved without converting.",

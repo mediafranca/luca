@@ -1,5 +1,6 @@
 export function documentHeadings(text, format) {
   const headings = [];
+  if (format === "text") return headings;
   let offset = 0;
   for (const line of text.split(/\n/)) {
     const match = format === "wikitext"

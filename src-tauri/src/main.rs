@@ -954,7 +954,7 @@ fn main() {
     match file_argument::requested_information(startup_args.clone()) {
         Some("help") => {
             println!(
-                "Luca {}\n\nUso: luca [--new] [--] [archivo …]\n\n  Admite .md, .markdown, .wiki y .wikitext.\n\n  --new          crea una pestaña vacía\n  -h, --help     muestra esta ayuda\n  -V, --version  muestra la versión",
+                "Luca {}\n\nUso: luca [--new] [--] [archivo …]\n\n  Admite .md, .markdown, .wiki, .wikitext y .txt.\n\n  --new          crea una pestaña vacía\n  -h, --help     muestra esta ayuda\n  -V, --version  muestra la versión",
                 env!("CARGO_PKG_VERSION")
             );
             return;

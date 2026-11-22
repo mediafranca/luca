@@ -504,6 +504,15 @@ async function renderDoc(doc, force = false) {
   // wiki: aquí se limpia para que no sobreviva a un cambio de formato ni al
   // apagar el interruptor (con ella puesta, el panel va sin su medida).
   doc.previewEl.removeAttribute("data-wiki-styles");
+  if (doc.format === "text") {
+    // Texto plano: la vista previa es el texto tal cual, sin interpretar.
+    const pre = document.createElement("pre");
+    pre.className = "plain-text";
+    pre.textContent = doc.ed.getDoc();
+    doc.previewEl.replaceChildren(pre);
+    doc.renderCache = null;
+    return;
+  }
   if (doc.format === "wikitext") {
     const api = wikiApi();
     if (!TAURI) {
@@ -801,8 +810,8 @@ async function saveDoc(doc, forceDialog = false) {
   let path = previousPath;
   const isNew = forceDialog || !path;
   if (isNew) {
-    const ext = doc.format === "wikitext" ? "wiki" : "md";
-    path = await TAURI.dialog.save({ defaultPath: doc.path ?? `${t("dialog.untitled_file")}.${ext}`, filters: [{ name: t("dialog.filter.markup"), extensions: ["md", "markdown", "wiki", "wikitext"] }] });
+    const ext = { wikitext: "wiki", text: "txt" }[doc.format] ?? "md";
+    path = await TAURI.dialog.save({ defaultPath: doc.path ?? `${t("dialog.untitled_file")}.${ext}`, filters: [{ name: t("dialog.filter.markup"), extensions: ["md", "markdown", "wiki", "wikitext", "txt"] }] });
     if (!path) return;
   } else {
     // ¿cambió fuera de luca (p.ej. Vera) desde que lo leímos? No pisar en silencio.
@@ -1113,7 +1122,8 @@ function updateFormatControls(doc) {
   formatWarning.hidden = !extensionMismatch(doc.path, doc.formatSelection);
   formatWarning.title = formatWarning.hidden ? "" : t("status.format.warning.detail");
   // La barra no se oculta en Wikitext: adapta su marcado al formato del documento.
-  if (editorToolbar) { editorToolbar.hidden = false; editorToolbar.refresh?.(doc.format); }
+  // El texto plano no tiene marcado que insertar.
+  if (editorToolbar) { editorToolbar.hidden = doc.format === "text"; editorToolbar.refresh?.(doc.format); }
   document.body.dataset.format = doc.format;
   updateWikiStatus(doc);
   updateOutline(doc);

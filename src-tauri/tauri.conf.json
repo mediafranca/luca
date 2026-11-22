@@ -65,6 +65,14 @@
         "description": "Documento Wikitext",
         "role": "Editor",
         "mimeType": "text/x-wiki"
+      },
+      {
+        "ext": ["txt"],
+        "name": "Plain Text Document",
+        "description": "Texto plano",
+        "role": "Editor",
+        "rank": "Alternate",
+        "mimeType": "text/plain"
       }
     ]
   }
