@@ -72,3 +72,15 @@ test("la bandera de estilos de wiki se limpia antes de ramificar por formato", (
     "la limpieza vive en renderDoc, antes del if de formato",
   );
 });
+
+test("interpola el scroll entre bloques en ambos sentidos", async () => {
+  const { lineToY, yToLine } = await import("../ui/preview-behavior.js");
+  const anchors = [{ line: 1, y: 0 }, { line: 5, y: 100 }, { line: 6, y: 400 }, { line: 11, y: 500 }];
+  assert.equal(lineToY(anchors, 3), 50);
+  assert.equal(lineToY(anchors, 5.5), 250);
+  assert.equal(lineToY(anchors, 0), 0);
+  assert.equal(lineToY(anchors, 99), 500);
+  assert.equal(yToLine(anchors, 250), 5.5);
+  assert.equal(yToLine(anchors, lineToY(anchors, 8.2)), 8.2);
+  assert.equal(lineToY([], 3), 0);
+});

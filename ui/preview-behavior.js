@@ -46,3 +46,22 @@ export function scopeWikiCss(css) {
 // familia que Luca no tenga cae en la pila que nombra la propia wiki
 // (system-ui, Palatino, Georgia…), es decir, en las del sistema.
 const WIKI_FONT_FACE = /@font-face\s*\{[^{}]*\}/g;
+
+// Vista dividida a la par: `anchors` son pares { line, y } ordenados (línea de
+// origen de cada bloque y su altura en la vista previa). Entre dos anclas se
+// interpola linealmente, así el scroll fluye dentro de un bloque largo.
+function interpolate(anchors, value, from, to) {
+  if (!anchors.length) return 0;
+  if (value <= anchors[0][from]) return anchors[0][to];
+  for (let i = 1; i < anchors.length; i++) {
+    const a = anchors[i - 1], b = anchors[i];
+    if (value < b[from]) {
+      const span = b[from] - a[from];
+      return span > 0 ? a[to] + ((value - a[from]) / span) * (b[to] - a[to]) : a[to];
+    }
+  }
+  return anchors[anchors.length - 1][to];
+}
+
+export const lineToY = (anchors, line) => interpolate(anchors, line, "line", "y");
+export const yToLine = (anchors, y) => interpolate(anchors, y, "y", "line");

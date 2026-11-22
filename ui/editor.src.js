@@ -91,7 +91,9 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
     EditorView.lineWrapping,
     themeComp.of(themeFor(dark, block)),
     EditorView.updateListener.of((u) => {
-      if (u.docChanged) onChange(u.state.doc.toString());
+      // Sólo se copia el texto si quien escucha lo pide: en el editor principal
+      // sería una copia completa del documento por pulsación.
+      if (u.docChanged) onChange.length ? onChange(u.state.doc.toString()) : onChange();
       if (u.selectionSet || u.docChanged) onCursor?.();
     }),
   ];
@@ -130,6 +132,24 @@ export function createMarkdownEditor({ parent, doc, dark, onChange, onCursor, bl
     serialize: () => view.state.toJSON({ history: historyField }),
     getScroll: () => ({ top: view.scrollDOM.scrollTop, left: view.scrollDOM.scrollLeft }),
     setScroll: ({ top = 0, left = 0 } = {}) => requestAnimationFrame(() => view.scrollDOM.scrollTo({ top, left })),
+    // Línea fraccionaria en el borde superior visible (12.5 = mitad de la 12)
+    // y su inversa: la vista dividida las usa para llevar ambos paneles a la par.
+    getTopLine: () => {
+      const sc = view.scrollDOM;
+      const h = sc.getBoundingClientRect().top - view.documentTop;
+      const block = view.lineBlockAtHeight(Math.max(0, h));
+      const frac = block.height ? Math.min(1, Math.max(0, (h - block.top) / block.height)) : 0;
+      return view.state.doc.lineAt(block.from).number + frac;
+    },
+    scrollToLine: (x) => {
+      const sc = view.scrollDOM;
+      const doc = view.state.doc;
+      const n = Math.min(doc.lines, Math.max(1, Math.floor(x)));
+      const block = view.lineBlockAt(doc.line(n).from);
+      const offset = view.documentTop - sc.getBoundingClientRect().top + sc.scrollTop;
+      sc.scrollTop = offset + block.top + (x - n) * block.height;
+    },
+    lineCount: () => view.state.doc.lines,
     getSelection: () => {
       const sel = view.state.selection.main;
       return {

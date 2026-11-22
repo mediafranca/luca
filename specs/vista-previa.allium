@@ -85,6 +85,8 @@ surface Editor {
         -- archivo original ni lo marca guardado. Una preferencia (activa por
         -- omisión) permite no restaurar: la sesión se sigue guardando, pero
         -- luca arranca con un documento vacío.
+        -- Mientras se escribe, la sesión se guarda tras un segundo de pausa
+        -- y al instante cuando la ventana pierde el foco o se cierra.
 
     @guarantee ArchivosRecientes
         -- Las rutas abiertas o guardadas recientemente son consultables desde
@@ -144,6 +146,13 @@ surface VistaPrevia {
         -- documento guarda siempre el texto fuente; luca no exporta ni
         -- sustituye el diagrama por SVG.
 
+    @guarantee RenderIncremental
+        -- Al editar, la vista previa sólo rehace los bloques cuyo resultado
+        -- cambió: los demás conservan su DOM, sus diagramas y sus medios. Un
+        -- diagrama que cambia sigue mostrándose como estaba hasta que el
+        -- nuevo está listo. El tema, la paleta de Mermaid, el idioma o la
+        -- carpeta del archivo invalidan lo conservado.
+
     @guarantee NotasAlPie
         -- `texto[^n]` con su `[^n]: aclaración` se muestra como un superíndice
         -- numerado por orden de llamada que enlaza a la nota, y la nota vuelve
@@ -171,10 +180,14 @@ surface VistaPrevia {
         -- tablas ocupan el ancho de la página sin truncarse, también con las
         -- CSS de la wiki.
 
-    @guarantee SigueAlCursor
-        -- En la vista dividida, la vista previa se desplaza al bloque donde
-        -- está el cursor del editor; la proporción entre ambos paneles se
-        -- ajusta arrastrando el divisor.
+    @guarantee DesplazamientoALaPar
+        -- En la vista dividida, editor y vista previa se desplazan juntos en
+        -- ambos sentidos: el panel que se mueve manda y el otro lo sigue por
+        -- la línea de origen de cada bloque, interpolando dentro de un bloque
+        -- largo. Si un panel llega al final, el otro también. Sin esas
+        -- líneas (Wikitext) el seguimiento es proporcional. Tras renderizar,
+        -- la vista previa se alinea con el editor. La proporción entre ambos
+        -- paneles se ajusta arrastrando el divisor.
 
     @guarantee MediosLocalesEnLaVistaPrevia
         -- Una imagen, un audio o un vídeo referidos con ruta relativa se

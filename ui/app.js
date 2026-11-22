@@ -6,7 +6,7 @@ import { addFootnote, createEditorToolbar, editDocumentTableAtIndex } from "./to
 import { footnoteExtension } from "./footnotes.js";
 import { icon } from "./icons.js";
 import { beginBlockEdit, exitBlockEdit } from "./block-edit.js";
-import { externalWebUrl, isEditablePreviewMode, isInternalAnchor, scopeWikiCss } from "./preview-behavior.js";
+import { externalWebUrl, isEditablePreviewMode, isInternalAnchor, lineToY, scopeWikiCss, yToLine } from "./preview-behavior.js";
 import { moveByOffset, reorderById } from "./tab-order.js";
 import { extensionMismatch, interpretedFormat } from "./document-format.js";
 import DOMPurify from "./vendor/dompurify/purify.es.mjs";
@@ -97,6 +97,7 @@ const mermaidTheme = () => { try { return localStorage.getItem("luca.mermaidThem
 // así el diagrama hereda la paleta de la app (claro/oscuro). El usuario puede
 // elegir otro preset desde Preferencias.
 function initMermaid() {
+  previewEpoch++;
   if (!mermaid) return;
   // "strict": DOMPurify sanea las etiquetas (siguen valiendo <b>, <br>…) y
   // las URL. "loose" no saneaba nada y dejaba a `click … call` invocar
@@ -158,14 +159,20 @@ const RECENT_KEY = "luca.recentFiles";
 const readJsonStorage = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 };
-function saveSessionSoon() {
+// Escribir es lo único que pide la espera larga: serializar la sesión en cada
+// pausa breve se notaba como tirones. Al perder el foco o salir se vacía ya.
+function saveSessionSoon(delay = 120) {
   if (restoringSession) return;
   clearTimeout(sessionTimer);
-  sessionTimer = setTimeout(saveSessionNow, 120);
+  sessionTimer = setTimeout(saveSessionNow, delay);
 }
 function saveSessionNow() {
   if (restoringSession) return;
-  const snapshot = sessionSnapshot(docs.map((doc) => ({ ...doc, content: doc.ed.getSource() })), active?.id);
+  clearTimeout(sessionTimer);
+  // Un archivo limpio se relee del disco: su texto no viaja a la sesión.
+  const snapshot = sessionSnapshot(docs.map((doc) => ({
+    ...doc, content: !doc.path || doc.dirty ? doc.ed.getSource() : "",
+  })), active?.id);
   try { localStorage.setItem(sessionStorageKey, JSON.stringify(snapshot)); } catch {}
 }
 function rememberRecent(path) {
@@ -303,16 +310,17 @@ function toAssetUrl(filePath) {
   return filePath;
 }
 
-// Markdown → DOM por bloques: cada elemento de nivel superior lleva data-line
-// con la línea del texto donde empieza su bloque (para sincronizar el scroll y,
-// más adelante, para la edición por bloques).
+// Markdown → bloques: HTML saneado de cada token de nivel superior, con la
+// línea donde empieza y su rango en el texto. El HTML es la identidad del
+// bloque: si no cambia, la vista previa conserva su DOM (ver renderDoc). Las
+// notas al pie y los enlaces por referencia ya van resueltos en ese HTML.
 const footnotes = footnoteExtension({ backLabel: () => t("preview.footnote_back") });
 
-function renderBlocks(src) {
+function markdownBlocks(src) {
   const text = src.replace(/\r\n|\r/g, "\n");
   footnotes.reset(text);
   const nl = (t) => (t.match(/\n/g) || []).length;
-  const out = document.createElement("template");
+  const blocks = [];
   let pos = 0, line = 1;
   for (const tok of marked.lexer(text)) {
     // ponytail: marked omite los tokens `def`; indexOf recupera el hueco.
@@ -320,21 +328,21 @@ function renderBlocks(src) {
     if (at < 0) at = pos;
     line += nl(text.slice(pos, at));
     if (tok.type !== "space") {
-      const t = document.createElement("template");
-      t.innerHTML = DOMPurify.sanitize(marked.parser([tok]), PREVIEW_SANITIZE_OPTIONS);
       const src = tok.raw.replace(/\n+$/, "");   // sin las líneas en blanco que separan bloques
-      for (const el of t.content.children) {
-        el.dataset.line = line;
-        el.dataset.from = at;
-        el.dataset.to = at + src.length;
-      }
-      out.content.append(t.content);
+      blocks.push({
+        html: DOMPurify.sanitize(marked.parser([tok]), PREVIEW_SANITIZE_OPTIONS),
+        line, from: at, to: at + src.length,
+      });
     }
     line += nl(tok.raw);
     pos = at + tok.raw.length;
   }
-  return out.content;
+  return blocks;
 }
+
+// Cambia de época todo lo que invalida el DOM ya renderizado sin cambiar su
+// HTML: tema y colores de Mermaid (initMermaid) o idioma de los avisos.
+let previewEpoch = 0;
 
 // ---------- Vista previa Wikitext: HTML y estilos de la wiki ----------
 const wikiNotice = (text) => {
@@ -430,6 +438,64 @@ async function showWikiHtml(doc, cache, renderVersion) {
   doc.previewEl.replaceChildren(host);
 }
 
+// Prepara un bloque recién renderizado, aún fuera del DOM: medios locales,
+// diagramas Mermaid y botón de edición de tablas. Devuelve false si llegó un
+// render más nuevo.
+async function prepareBlock(doc, root, docDir, renderVersion) {
+  // Rutas relativas de imágenes y medios locales respecto al archivo abierto.
+  if (docDir) {
+    for (const el of root.querySelectorAll("img, video, audio, source")) {
+      const rawSrc = el.getAttribute("src");
+      if (!rawSrc) continue;
+      if (/^([a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)/i.test(rawSrc.trim())) continue;
+      const absPath = resolveDocPath(docDir, rawSrc);
+      try {
+        const allowedPath = TAURI
+          ? await TAURI.core.invoke("allow_preview_asset", { path: absPath })
+          : absPath;
+        el.src = toAssetUrl(allowedPath);
+      } catch {
+        el.removeAttribute("src");
+        el.title = t("preview.asset_blocked");
+      }
+    }
+  }
+
+  for (const block of root.querySelectorAll("pre.mermaid")) {
+    const def = block.textContent;
+    try {
+      const { svg, bindFunctions } = await mermaid.render(`luca-d${seq++}`, def);
+      if (renderVersion !== doc.renderVersion) return false;
+      block.innerHTML = svg;
+      bindFunctions?.(block);
+    } catch (err) {
+      block.className = "mermaid-error";
+      block.textContent = t("preview.mermaid_error", { error: err?.message ?? err });
+    }
+  }
+
+  // Tablas: botón de edición visual (reciclado de Vera). El índice se calcula
+  // al pulsar: el bloque puede haberse movido desde que se preparó.
+  for (const table of root.querySelectorAll("table")) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "preview-table-wrapper";
+    table.replaceWith(wrapper);
+    wrapper.append(table);
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "preview-edit-table";
+    editBtn.innerHTML = `${icon("grid")} Editar tabla`;
+    editBtn.title = t("table.edit");
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      editDocumentTableAtIndex(doc, [...doc.previewEl.querySelectorAll("table")].indexOf(table));
+    });
+    wrapper.append(editBtn);
+  }
+  return renderVersion === doc.renderVersion;
+}
+
 async function renderDoc(doc, force = false) {
   if (doc.block) return;   // hay un bloque en edición: se renderiza al salir
   if (!force && document.body.dataset.mode === "source") return;
@@ -476,62 +542,46 @@ async function renderDoc(doc, force = false) {
   const source = doc.ed.getDoc();
   await ensurePreviewRuntime(source);
   if (renderVersion !== doc.renderVersion) return;
-  doc.previewEl.replaceChildren(renderBlocks(source));
-
-  // Resolver rutas relativas de imágenes y medios locales respecto al archivo abierto
+  // Reconciliación: cada bloque cuyo HTML no cambió conserva sus nodos (con
+  // sus diagramas e imágenes ya resueltos). Sólo los nuevos se preparan, fuera
+  // del DOM: mientras Mermaid dibuja, la vista sigue mostrando lo anterior.
   const docDir = getDocDir(doc);
-  if (docDir) {
-    const mediaEls = doc.previewEl.querySelectorAll("img, video, audio, source");
-    for (const el of mediaEls) {
-      const rawSrc = el.getAttribute("src");
-      if (!rawSrc) continue;
-      if (/^([a-zA-Z][a-zA-Z0-9+.-]*:|\/\/)/i.test(rawSrc.trim())) continue;
-      const absPath = resolveDocPath(docDir, rawSrc);
-      try {
-        const allowedPath = TAURI
-          ? await TAURI.core.invoke("allow_preview_asset", { path: absPath })
-          : absPath;
-        el.src = toAssetUrl(allowedPath);
-      } catch {
-        el.removeAttribute("src");
-        el.title = t("preview.asset_blocked");
-      }
+  const context = `${docDir}|${previewEpoch}|${document.documentElement.lang}`;
+  const reuse = new Map();
+  if (doc.renderCache?.context === context) {
+    for (const g of doc.renderCache.groups) {
+      if (!reuse.has(g.html)) reuse.set(g.html, []);
+      reuse.get(g.html).push(g);
     }
   }
-
-  for (const block of doc.previewEl.querySelectorAll("pre.mermaid")) {
-    const def = block.textContent;
-    try {
-      const { svg, bindFunctions } = await mermaid.render(`luca-d${seq++}`, def);
-      if (renderVersion !== doc.renderVersion) return;
-      block.innerHTML = svg;
-      bindFunctions?.(block);
-    } catch (err) {
-      block.className = "mermaid-error";
-      block.textContent = t("preview.mermaid_error", { error: err?.message ?? err });
+  const fresh = [];
+  const groups = markdownBlocks(source).map((b) => {
+    let g = reuse.get(b.html)?.shift();
+    if (!g) {
+      const host = document.createElement("div");
+      host.innerHTML = b.html;
+      g = { html: b.html, host, els: [...host.children], nodes: null };
+      fresh.push(g);
     }
-  }
-
-  // Detectar tablas en la vista previa y agregar botón visual de edición (reciclado de Vera)
-  const tables = [...doc.previewEl.querySelectorAll("table")];
-  tables.forEach((table, tableIndex) => {
-    if (table.parentElement?.classList.contains("preview-table-wrapper")) return;
-    const wrapper = document.createElement("div");
-    wrapper.className = "preview-table-wrapper";
-    table.replaceWith(wrapper);
-    wrapper.append(table);
-
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "preview-edit-table";
-    editBtn.innerHTML = `${icon("grid")} Editar tabla`;
-    editBtn.title = t("table.edit");
-    editBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      editDocumentTableAtIndex(doc, tableIndex);
-    });
-    wrapper.append(editBtn);
+    for (const el of g.els) Object.assign(el.dataset, { line: b.line, from: b.from, to: b.to });
+    return g;
   });
+  for (const g of fresh) {
+    if (!(await prepareBlock(doc, g.host, docDir, renderVersion))) return;
+    g.nodes = [...g.host.childNodes];
+    g.host = null;
+  }
+  if (renderVersion !== doc.renderVersion) return;
+
+  // Se mueve sólo lo que cambió: un nodo que ya está en su sitio no se toca.
+  const pv = doc.previewEl;
+  let cur = pv.firstChild;
+  for (const n of groups.flatMap((g) => g.nodes)) {
+    if (n === cur) cur = cur.nextSibling;
+    else pv.insertBefore(n, cur);
+  }
+  while (cur) { const next = cur.nextSibling; cur.remove(); cur = next; }
+  doc.renderCache = { context, groups };
   syncPreview(doc);
 }
 
@@ -539,8 +589,9 @@ async function renderDoc(doc, force = false) {
 function onEdit(doc) {
   if (!doc.dirty) { doc.dirty = true; renderTabs(); if (doc === active) setTitle(); }
   clearTimeout(doc.t);
-  saveSessionSoon();
-  updateOutline(doc);
+  clearTimeout(doc.outlineTimer);
+  saveSessionSoon(1000);
+  doc.outlineTimer = setTimeout(() => updateOutline(doc), 300);
   if (document.body.dataset.mode === "source") return;
   doc.t = setTimeout(() => renderDoc(doc), doc.format === "wikitext" ? 650 : 150);
 }
@@ -700,12 +751,14 @@ function makeDoc(initialDoc, path, selection = null, restored = {}) {
     doc: initialDoc,
     dark: isCurrentDark(),
     onChange: () => onEdit(doc),
-    onCursor: () => { syncPreview(doc); updateCursorStatus(doc); },
+    onCursor: () => updateCursorStatus(doc),
     format: doc.format,
     lineSeparator: doc.lineEnding === "CRLF" ? "\r\n" : doc.lineEnding === "CR" ? "\r" : "\n",
     stateJson: restored.editorState || null,
   });
   if (restored.scroll) doc.ed.setScroll(restored.scroll);
+  doc.ed.getView().scrollDOM.addEventListener("scroll", () => onPanelScroll(doc, "editor"), { passive: true });
+  previewEl.addEventListener("scroll", () => onPanelScroll(doc, "preview"), { passive: true });
   editorEl.append(cmMount);
 
   docs.push(doc);
@@ -1080,20 +1133,49 @@ formatSelect?.addEventListener("change", () => {
   saveSessionSoon();
 });
 
-// Lleva la vista previa al bloque donde está el cursor: sólo en split y para
-// el documento activo. Los bloques llevan data-line (ver renderBlocks).
-function syncPreview(doc) {
-  if (doc !== active || document.body.dataset.mode !== "split") return;
-  const line = doc.ed.getCursorLine();
-  let target = null;
-  for (const el of doc.previewEl.querySelectorAll("[data-line]")) {
-    if (Number(el.dataset.line) > line) break;
-    target = el;
-  }
-  if (!target) return;
+// Vista dividida a la par: el panel que se desplaza manda y el otro lo sigue
+// por las anclas data-line (ver markdownBlocks); sin anclas (Wikitext) queda
+// proporcional. `scrollDriver` descarta el eco: el scroll que provoca el
+// seguidor no vuelve a mover al que manda.
+let scrollDriver = null, scrollDriverTimer = 0;
+function leadScroll(panel) {
+  scrollDriver = panel;
+  clearTimeout(scrollDriverTimer);
+  scrollDriverTimer = setTimeout(() => { scrollDriver = null; }, 120);
+}
+
+function previewAnchors(doc) {
   const pv = doc.previewEl;
-  const top = pv.scrollTop + target.getBoundingClientRect().top - pv.getBoundingClientRect().top - 24;
-  pv.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  const base = pv.getBoundingClientRect().top - pv.scrollTop;
+  const anchors = [{ line: 1, y: 0 }];
+  for (const el of pv.querySelectorAll("[data-line]")) {
+    anchors.push({ line: Number(el.dataset.line), y: el.getBoundingClientRect().top - base });
+  }
+  anchors.push({ line: doc.ed.lineCount() + 1, y: pv.scrollHeight });
+  return anchors;
+}
+
+function followScroll(doc, from) {
+  if (doc !== active || document.body.dataset.mode !== "split") return;
+  const pv = doc.previewEl, sc = doc.ed.getView().scrollDOM;
+  const atEnd = (el) => el.scrollTop > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+  const anchors = previewAnchors(doc);
+  if (from === "editor") pv.scrollTop = atEnd(sc) ? pv.scrollHeight : lineToY(anchors, doc.ed.getTopLine());
+  else if (atEnd(pv)) sc.scrollTop = sc.scrollHeight;
+  else doc.ed.scrollToLine(yToLine(anchors, pv.scrollTop));
+}
+
+function onPanelScroll(doc, panel) {
+  if (scrollDriver && scrollDriver !== panel) return;
+  leadScroll(panel);
+  if (doc.scrollFrame) return;
+  doc.scrollFrame = requestAnimationFrame(() => { doc.scrollFrame = 0; followScroll(doc, panel); });
+}
+
+// Tras renderizar o cambiar de modo, la vista previa se alinea con el editor.
+function syncPreview(doc) {
+  leadScroll("editor");
+  followScroll(doc, "editor");
 }
 
 // ---------- Modos de vista (source · split · rendered), tema y zen ----------
@@ -2371,6 +2453,8 @@ async function restorePreviousSession() {
   return true;
 }
 
+addEventListener("blur", saveSessionNow);
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveSessionNow(); });
 addEventListener("beforeunload", (event) => {
   saveSessionNow();
   if (docs.some((doc) => doc.dirty)) {
