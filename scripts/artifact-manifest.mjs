@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const artifactSuffixes = [".appimage", ".deb", ".dmg", ".exe", ".msi", ".rpm", ".sig", ".tar.gz"];
+const artifactSuffixes = [".appimage", ".deb", ".dmg", ".exe", ".msi", ".rpm", ".app.tar.gz"];
 
 function artifactFiles(root) {
   const files = [];
