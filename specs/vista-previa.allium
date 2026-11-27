@@ -69,8 +69,8 @@ surface Editor {
 
     @guarantee IdentidadDeLaObra
         -- Los menús, el diálogo Acerca de Luca y los instaladores presentan a
-        -- Luca como una iniciativa de MediaFranca creada por Herbert Spencer,
-        -- enlazan Casiopea y GitHub, declaran la licencia EUPL 1.2 y usan la
+        -- Luca como una iniciativa de MediaFranca; el diálogo enlaza el sitio
+        -- de MediaFranca y el código fuente, declara la licencia EUPL 1.2 y usa la
         -- letra capital L inspirada en Luca Pacioli como icono de la aplicación.
 
     @guarantee FormatoPorDocumento

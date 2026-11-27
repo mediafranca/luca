@@ -480,9 +480,13 @@
     box-shadow:0 22px 70px rgba(0,0,0,.34); text-align:center;
     font-family:var(--font-ui, var(--font-body)); }
   .about-icon { width:112px; height:112px; display:block; margin:0 auto 14px; }
-  .about-panel h2 { margin:0 0 4px; font-size:1.5rem; }
-  .about-version { margin:0 0 18px; color:var(--text-dim); font-size:.86rem; }
-  .about-panel p { margin:10px auto; max-width:39ch; line-height:1.5; }
+  .about-panel h2 { margin:0; font-size:1.75rem; letter-spacing:.01em; }
+  .about-version { margin:2px 0 20px; color:var(--text-dim); font-size:.82rem; font-variant-numeric:tabular-nums; }
+  .about-panel p { margin:0 auto; max-width:36ch; line-height:1.5; text-wrap:balance; }
+  .about-panel .about-tagline { font-size:1.05rem; }
+  .about-panel .about-origin { margin-top:12px; color:var(--text-dim); font-size:.86rem; }
+  .about-credit { margin-top:22px; padding-top:18px; border-top:1px solid var(--rule); font-size:.9rem; }
+  .about-panel .about-links { margin-top:4px; color:var(--text-dim); font-size:.82rem; }
   .about-panel a { color:var(--accent); }
   .about-actions { display:flex; justify-content:center; margin-top:22px; }
   .utility-dialog { position:fixed; inset:0; z-index:120; display:grid; place-items:start center;
@@ -750,10 +754,12 @@
       <img class="about-icon" src="vendor/luca-icon.png" alt="Letra capital L de Luca" data-i18n-alt="about.icon">
       <h2 id="aboutTitle">Luca</h2>
       <p id="aboutVersion" class="about-version" data-i18n="about.version.dev">versión de desarrollo</p>
-      <p data-i18n="about.tagline">Un editor Markdown y Wikitext para pensar y escribir con archivos propios.</p>
-      <p><strong data-i18n="about.credit">Iniciativa de MediaFranca creada por Herbert Spencer.</strong></p>
-      <p><span data-i18n="about.name">Su nombre y su letra capital L recuerdan a Luca Pacioli y la construcción geométrica de las letras en</span> <em data-i18n="about.divina">Divina proportione</em> (1509).</p>
-      <p><a href="https://wiki.ead.pucv.cl/Luca" data-external>Casiopea</a> · <a href="https://github.com/mediafranca/luca" data-external>GitHub</a> · EUPL 1.2</p>
+      <p class="about-tagline" data-i18n="about.tagline">Un editor Markdown y Wikitext para pensar y escribir con archivos propios.</p>
+      <p class="about-origin"><span data-i18n="about.name">Su nombre y su letra capital L recuerdan a Luca Pacioli y la construcción geométrica de las letras en</span> <em data-i18n="about.divina">Divina proportione</em> (1509).</p>
+      <footer class="about-credit">
+        <p><span data-i18n="about.credit">Una iniciativa de</span> <a href="https://mediafranca.net" data-external>MediaFranca</a></p>
+        <p class="about-links"><a href="https://github.com/mediafranca/luca" data-external data-i18n="about.source">Código fuente</a> · <span data-i18n="about.license">Licencia EUPL 1.2</span></p>
+      </footer>
       <div class="about-actions"><button type="button" id="aboutClose" class="btn-primary" data-i18n="about.close">Cerrar</button></div>
     </div>
   </div>

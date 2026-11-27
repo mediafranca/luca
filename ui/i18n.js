@@ -332,14 +332,13 @@ const es = {
   "about.version": "versión {version}",
   "about.version.dev": "versión de desarrollo",
   "about.tagline": "Un editor Markdown y Wikitext para pensar y escribir con archivos propios.",
-  "about.credit": "Iniciativa de MediaFranca creada por Herbert Spencer.",
+  "about.credit": "Una iniciativa de",
   "about.name":
     "Su nombre y su letra capital L recuerdan a Luca Pacioli y la construcción geométrica " +
     "de las letras en",
   "about.divina": "Divina proportione",
-  "about.casiopea": "Casiopea",
-  "about.github": "GitHub",
-  "about.license": "· EUPL 1.2",
+  "about.source": "Código fuente",
+  "about.license": "Licencia EUPL 1.2",
   "about.close": "Cerrar",
   "about.icon": "Letra capital L de Luca",
 
@@ -701,14 +700,13 @@ const en = {
   "about.version": "version {version}",
   "about.version.dev": "development build",
   "about.tagline": "A Markdown and Wikitext editor for thinking and writing in your own files.",
-  "about.credit": "A MediaFranca initiative created by Herbert Spencer.",
+  "about.credit": "An initiative of",
   "about.name":
     "Its name and its capital L recall Luca Pacioli and the geometric construction of " +
     "letters in",
   "about.divina": "Divina proportione",
-  "about.casiopea": "Casiopea",
-  "about.github": "GitHub",
-  "about.license": "· EUPL 1.2",
+  "about.source": "Source code",
+  "about.license": "EUPL 1.2 license",
   "about.close": "Close",
   "about.icon": "Luca's capital letter L",
 
