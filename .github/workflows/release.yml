@@ -8,6 +8,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Tag o commit que se empaquetará (vacío: la rama elegida)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -32,6 +37,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -95,7 +102,7 @@ jobs:
             ```sh
             cosign verify-blob ARCHIVO \
               --bundle ARCHIVO.sigstore.json \
-              --certificate-identity "https://github.com/mediafranca/luca/.github/workflows/release.yml@refs/tags/v__VERSION__" \
+              --certificate-identity "https://github.com/${{ github.workflow_ref }}" \
               --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
             ```
 
@@ -126,10 +133,13 @@ jobs:
       - name: Firmar instaladores con Sigstore
         shell: bash
         run: |
-          mapfile -t artifacts < <(find src-tauri/target -type f -path '*/bundle/*' \( \
+          artifacts=()
+          while IFS= read -r -d '' artifact; do
+            artifacts+=("$artifact")
+          done < <(find src-tauri/target -type f -path '*/bundle/*' \( \
             -iname '*.dmg' -o -iname '*.exe' -o -iname '*.msi' -o \
             -iname '*.AppImage' -o -iname '*.deb' -o -iname '*.rpm' \
-          \) | sort)
+          \) -print0)
           test "${#artifacts[@]}" -gt 0
           for artifact in "${artifacts[@]}"; do
             cosign sign-blob --yes --bundle "${artifact}.sigstore.json" "$artifact"
@@ -151,7 +161,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mapfile -t bundles < <(find src-tauri/target -type f -name '*.sigstore.json' -path '*/bundle/*' | sort)
+          bundles=()
+          while IFS= read -r -d '' bundle; do
+            bundles+=("$bundle")
+          done < <(find src-tauri/target -type f -name '*.sigstore.json' -path '*/bundle/*' -print0)
           test "${#bundles[@]}" -gt 0
           gh release upload "v${{ steps.app-version.outputs.version }}" \
             "checksums-${{ runner.os }}-${{ runner.arch }}.txt" "${bundles[@]}" --clobber
