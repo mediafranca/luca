@@ -5,6 +5,8 @@
 # Luca
 
 Editor Markdown y Wikitext de escritorio
+
+**Español** · [English](README.en.md)
 </div>
 
 Luca es un editor de texto Markdown y Wikitext para macOS, Windows y Linux.
@@ -170,6 +172,32 @@ Estas garantías orientan cada cambio. El detalle verificable está en
   Wikitext, que sólo consulta la wiki que configures.
 - **Contenido ajeno, sin privilegios.** El HTML se sanea, los diagramas no
   ejecutan código y un `.md` ajeno no tiene acceso a la app.
+
+## Accesibilidad
+
+Luca toma como referencia las [Pautas de Accesibilidad para el Contenido Web
+(WCAG) 2.2](https://www.w3.org/TR/WCAG22/), nivel AA: la interfaz es HTML en el
+WebView del sistema, así que los criterios web se aplican directamente. Lo que
+hoy está implementado lo respaldan
+[`specs/accesibilidad.allium`](specs/accesibilidad.allium) y
+[`tests/accessibility.test.mjs`](tests/accessibility.test.mjs):
+
+- **Operación por teclado** (WCAG 2.1.1): pestañas, comandos, preferencias y
+  acciones principales se recorren y activan sin dispositivo apuntador.
+- **Foco visible** (2.4.7) y **orden del foco** (2.4.3): todo control enfocado
+  muestra un indicador; al cerrar un diálogo, la paleta o las preferencias, el
+  foco vuelve al control que los abrió.
+- **Nombre, función, valor** (4.1.2): pestañas, regiones, diálogos, listas y
+  controles exponen roles y nombres accesibles, y señalan el elemento
+  seleccionado.
+- **Idioma de la página** (3.1.1): sigue el idioma de la interfaz.
+- **Presentación adaptable** (1.4.4, 1.4.12): tipografías, tamaños, medidas y
+  colores son preferencias, con temas claro y oscuro.
+
+Falta por verificar: no hay una auditoría formal, no se ha medido el contraste
+de los temas por omisión y no se ha probado de forma sistemática con lectores
+de pantalla (VoiceOver, NVDA, Orca). Un problema de accesibilidad es un error:
+repórtalo en los [issues](https://github.com/mediafranca/luca/issues).
 
 ## Arquitectura
 
