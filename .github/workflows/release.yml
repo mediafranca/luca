@@ -71,7 +71,7 @@ jobs:
       - name: Verificar compilación nativa
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Firma ad hoc del bundle de macOS. La identidad pública del release
