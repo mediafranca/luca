@@ -1,0 +1,7 @@
+# Propone PRs mensuales con las actions al día (incluidas las fijadas por SHA).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

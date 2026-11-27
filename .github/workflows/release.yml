@@ -168,3 +168,18 @@ jobs:
           test "${#bundles[@]}" -gt 0
           gh release upload "v${{ steps.app-version.outputs.version }}" \
             "checksums-${{ runner.os }}-${{ runner.arch }}.txt" "${bundles[@]}" --clobber
+
+  # El borrador solo deja de serlo si los tres sistemas compilaron y firmaron:
+  # un build roto no publica un release a medias.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "v$(node -p "require('./package.json').version")" --draft=false --latest
