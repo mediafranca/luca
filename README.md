@@ -393,13 +393,17 @@ flowchart LR
 
 ### Distribución
 
-- **Notarización en macOS.** Es lo único que quita la necesidad de
-  `xattr -cr`. Requiere una cuenta del Apple Developer Program y un
-  certificado Developer ID; el flujo de release ya está preparado para usarlo.
+- **Firmas independientes.** Cada instalador se firma con Sigstore usando la
+  identidad efímera del workflow y recibe una attestation de procedencia de
+  GitHub. Esto permite comprobar origen e integridad sin custodiar una clave
+  privada de larga duración; no sustituye la confianza propia de Gatekeeper o
+  SmartScreen.
 - **Cask de Homebrew.** `brew install --cask luca` dejaría la app lista sin
   tocar la cuarentena. Sin coste.
-- **Flathub.** Hito comunitario para Linux. Siguiendo la política de Flathub,
-  el manifiesto y la propuesta los escribe una persona, no un agente.
+- **Flatpak independiente.** Se puede generar un bundle o repositorio propio y
+  distribuirlo desde GitHub Releases. Flathub es una ruta distinta: exige que
+  una persona escriba el manifiesto y toda la propuesta, prohíbe asistencia de
+  IA en ese material y evalúa por separado el código generado que se declare.
 
 ### Por decidir
 
@@ -417,6 +421,10 @@ Preguntas abiertas en las specs, que esperan una necesidad concreta:
 
 ## Cambios por versión
 
+- **0.7.7:** abre y guarda texto plano (`.txt`) sin imponer marcado, barra de
+  formato ni esquema; registra Luca como editor alternativo de esos archivos.
+  Los instaladores se publican como borrador con firmas Sigstore keyless,
+  attestations de procedencia y comprobación por hashes.
 - **0.7.6:** el editor y la vista previa se desplazan a la par en ambos
   sentidos; la vista previa sólo rehace los bloques que cambiaron y un
   diagrama editado se mantiene hasta que el nuevo está listo; menos trabajo
